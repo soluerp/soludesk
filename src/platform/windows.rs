@@ -1531,15 +1531,7 @@ pub fn copy_raw_cmd(src_raw: &str, _raw: &str, _path: &str) -> ResultType<String
 }
 
 pub fn copy_exe_cmd(src_exe: &str, exe: &str, path: &str) -> ResultType<String> {
-    let main_exe = copy_raw_cmd(src_exe, exe, path)?;
-    Ok(format!(
-        "
-        {main_exe}
-        copy /Y \"{ORIGIN_PROCESS_EXE}\" \"{path}\\{broker_exe}\"
-        ",
-        ORIGIN_PROCESS_EXE = win_topmost_window::ORIGIN_PROCESS_EXE,
-        broker_exe = win_topmost_window::INJECTED_PROCESS_EXE,
-    ))
+    copy_raw_cmd(src_exe, exe, path)
 }
 
 #[inline]
@@ -4862,6 +4854,19 @@ pub(super) fn get_pids_with_first_arg_by_wmic<S1: AsRef<str>, S2: AsRef<str>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn install_copy_does_not_copy_windows_runtime_broker() {
+        let cmd = copy_exe_cmd(
+            r"C:\Users\Example\AppData\Local\soludesk\soludesk.exe",
+            r"C:\Program Files\SOLUDESK\soludesk.exe",
+            r"C:\Program Files\SOLUDESK",
+        )
+        .expect("installation copy command");
+        assert!(cmd.contains("XCOPY"));
+        assert!(!cmd.contains("RuntimeBroker.exe"));
+        assert!(!cmd.contains("RuntimeBroker_rustdesk.exe"));
+    }
 
     #[test]
     fn vbs_files_use_utf16le_with_bom_and_crlf() {
