@@ -249,7 +249,7 @@ class MyTheme {
   MyTheme._();
 
   static const Color grayBg = Color(0xFFEFEFF2);
-  static const Color accent = Color(0xFF0071FF);
+  static const Color accent = Color(0xFF1269D3);
   static const Color accent50 = Color(0x770071FF);
   static const Color accent80 = Color(0xAA0071FF);
   static const Color canvasColor = Color(0xFF212121);
@@ -379,7 +379,7 @@ class MyTheme {
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       elevation: 15,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18.0),
@@ -410,7 +410,7 @@ class MyTheme {
     cardColor: grayBg,
     hintColor: Color(0xFFAAAAAA),
     visualDensity: VisualDensity.adaptivePlatformDensity,
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       labelColor: Colors.black87,
     ),
     tooltipTheme: tooltipTheme(),
@@ -452,7 +452,9 @@ class MyTheme {
         style:
             MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
     colorScheme: ColorScheme.light(
-        primary: Colors.blue, secondary: accent, background: grayBg),
+        primary: Color(0xFF1269D3),
+        secondary: Color(0xFF21BFB9),
+        background: grayBg),
     popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         shape: RoundedRectangleBorder(
@@ -477,7 +479,7 @@ class MyTheme {
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       elevation: 15,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18.0),
@@ -511,7 +513,7 @@ class MyTheme {
     ),
     cardColor: Color(0xFF24252B),
     visualDensity: VisualDensity.adaptivePlatformDensity,
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       labelColor: Colors.white70,
     ),
     tooltipTheme: tooltipTheme(),
@@ -560,8 +562,8 @@ class MyTheme {
         style: MenuStyle(
             backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),
     colorScheme: ColorScheme.dark(
-      primary: Colors.blue,
-      secondary: accent,
+      primary: Color(0xFF1269D3),
+      secondary: Color(0xFF21BFB9),
       background: Color(0xFF24252B),
     ),
     popupMenuTheme: PopupMenuThemeData(
@@ -724,6 +726,27 @@ closeConnection({String? id}) {
           debugPrint('[closeConnection] Failed to close terminal window: $e');
         }));
         return;
+      }
+      if (controller.tabType == DesktopTabType.remoteScreen) {
+        final page = id == null
+            ? (controller.length > 0
+                ? controller.state.value.selectedTabInfo.page
+                : null)
+            : controller.widget(id);
+        if (page is desktop_remote.RemotePage) {
+          unawaited(() async {
+            try {
+              await bind.sessionClose(sessionId: page.ffi.sessionId);
+              // Avoid a duplicate native close when removing the page disposes it.
+              desktop_remote.closeSessionOnDispose[page.id] = false;
+            } catch (e) {
+              debugPrint(
+                  'Failed to close remote session before closing viewer: $e');
+            }
+            controller.closeBy(id);
+          }());
+          return;
+        }
       }
       controller.closeBy(id);
     }

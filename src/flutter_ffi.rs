@@ -2440,6 +2440,10 @@ pub fn install_install_me(options: String, path: String) {
     install_me(options, path, false, false);
 }
 
+pub fn install_uninstall_me() {
+    crate::ui_interface::uninstall_me();
+}
+
 pub fn install_install_path() -> SyncReturn<String> {
     SyncReturn(install_path())
 }

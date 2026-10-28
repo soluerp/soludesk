@@ -49,6 +49,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
   String? peerId;
   bool _isScreenRectSet = false;
   int? _display;
+  bool _windowCloseInProgress = false;
 
   var connectionMap = RxList<Widget>.empty(growable: true);
 
@@ -87,6 +88,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
           )) {
             return;
           }
+          await _requestSessionClose(peerId!);
           tabController.closeBy(peerId!);
         },
         page: RemotePage(
@@ -337,6 +339,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
           )) {
             return;
           }
+          await _requestSessionClose(key);
           tabController.closeBy(key);
           cancelFunc();
         },
@@ -389,20 +392,47 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
     return widget.params["windowId"];
   }
 
-  Future<bool> handleWindowCloseButton() async {
-    final connLength = tabController.length;
-    if (connLength == 1) {
-      if (await desktopTryShowTabAuditDialogCloseCancelled(
-        id: tabController.state.value.tabs[0].key,
-        tabController: tabController,
-      )) {
-        return false;
-      }
+  Future<void> _requestSessionClose(String id) async {
+    final page = tabController.widget(id);
+    if (page is! RemotePage) return;
+    try {
+      await bind.sessionClose(sessionId: page.ffi.sessionId);
+      // The native close has already been requested. Prevent RemotePage.dispose
+      // from issuing the same request again while the tab is removed.
+      closeSessionOnDispose[id] = false;
+    } catch (e) {
+      debugPrint(
+          'Failed to close remote session before closing viewer $id: $e');
     }
-    if (connLength <= 1) {
-      tabController.clear();
-      return true;
-    } else {
+  }
+
+  Future<void> _requestAllSessionCloses() async {
+    final ids = tabController.state.value.tabs.map((tab) => tab.key).toList();
+    await Future.wait(ids.map(_requestSessionClose));
+  }
+
+  Future<bool> handleWindowCloseButton() async {
+    // Closing a Windows multi-window can trigger this callback more than once
+    // while the first close request is still waiting on the native bridge.
+    if (_windowCloseInProgress) return true;
+    _windowCloseInProgress = true;
+
+    final connLength = tabController.length;
+    try {
+      if (connLength == 1) {
+        if (await desktopTryShowTabAuditDialogCloseCancelled(
+          id: tabController.state.value.tabs[0].key,
+          tabController: tabController,
+        )) {
+          _windowCloseInProgress = false;
+          return false;
+        }
+      }
+      if (connLength <= 1) {
+        await _requestAllSessionCloses();
+        tabController.clear();
+        return true;
+      }
       final bool res;
       if (!option2bool(kOptionEnableConfirmClosingTabs,
           bind.mainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
@@ -411,9 +441,15 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
         res = await closeConfirmDialog();
       }
       if (res) {
+        await _requestAllSessionCloses();
         tabController.clear();
+        return true;
       }
-      return res;
+      _windowCloseInProgress = false;
+      return false;
+    } catch (_) {
+      _windowCloseInProgress = false;
+      rethrow;
     }
   }
 
@@ -460,6 +496,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
           )) {
             return;
           }
+          await _requestSessionClose(id);
           tabController.closeBy(id);
         },
         page: RemotePage(
@@ -480,6 +517,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
     } else if (call.method == kWindowDisableGrabKeyboard) {
       // ???
     } else if (call.method == "onDestroy") {
+      await _requestAllSessionCloses();
       tabController.clear();
     } else if (call.method == kWindowActionRebuild) {
       reloadCurrentWindow();

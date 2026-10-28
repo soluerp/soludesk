@@ -124,6 +124,7 @@ pub const SET_FOREGROUND_WINDOW: &'static str = "SET_FOREGROUND_WINDOW";
 
 const REG_NAME_INSTALL_DESKTOPSHORTCUTS: &str = "DESKTOPSHORTCUTS";
 const REG_NAME_INSTALL_STARTMENUSHORTCUTS: &str = "STARTMENUSHORTCUTS";
+const REG_NAME_INSTALL_STARTUP: &str = "STARTUP";
 pub const REG_NAME_INSTALL_PRINTER: &str = "PRINTER";
 const REG_NAME_MSI_PRODUCT_CODE: &str = "MsiProductCode";
 const REG_NAME_UNINSTALL_STRING: &str = "UninstallString";
@@ -1385,31 +1386,41 @@ pub fn get_install_options() -> String {
     if let Some(printer) = printer {
         opts.insert(REG_NAME_INSTALL_PRINTER, printer);
     }
+    let startup = get_reg_of_hkcr(&subkey, REG_NAME_INSTALL_STARTUP);
+    if let Some(startup) = startup {
+        opts.insert(REG_NAME_INSTALL_STARTUP, startup);
+    }
     serde_json::to_string(&opts).unwrap_or("{}".to_owned())
 }
 
 pub fn get_silent_install_options(printer_override: Option<bool>) -> &'static str {
-    if !is_win_10_or_greater() {
-        return "desktopicon startmenu";
-    }
-
-    let install_printer = match printer_override {
-        Some(override_value) => override_value,
-        None => {
-            let app_name = crate::get_app_name();
-            let subkey = format!(".{}", app_name.to_lowercase());
-            let printer = get_reg_of_hkcr(&subkey, REG_NAME_INSTALL_PRINTER);
-            printer.as_deref() == Some("1")
-                && remote_printer::is_rd_printer_installed(&app_name).unwrap_or_else(|err| {
-                    log::warn!("Failed to check printer installation status: {err}; skipping printer installation");
-                    false
-                })
+    let install_printer = if is_win_10_or_greater() {
+        match printer_override {
+            Some(override_value) => override_value,
+            None => {
+                let app_name = crate::get_app_name();
+                let subkey = format!(".{}", app_name.to_lowercase());
+                let printer = get_reg_of_hkcr(&subkey, REG_NAME_INSTALL_PRINTER);
+                printer.as_deref() == Some("1")
+                    && remote_printer::is_rd_printer_installed(&app_name).unwrap_or_else(|err| {
+                        log::warn!("Failed to check printer installation status: {err}; skipping printer installation");
+                        false
+                    })
+            }
         }
-    };
-    if install_printer {
-        "desktopicon startmenu printer"
     } else {
-        "desktopicon startmenu"
+        false
+    };
+    let app_name = crate::get_app_name();
+    let subkey = format!(".{}", app_name.to_lowercase());
+    let install_startup = get_reg_of_hkcr(&subkey, REG_NAME_INSTALL_STARTUP).as_deref()
+        == Some("1")
+        && !config::is_outgoing_only();
+    match (install_printer, install_startup) {
+        (true, true) => "desktopicon startmenu printer startup",
+        (true, false) => "desktopicon startmenu printer",
+        (false, true) => "desktopicon startmenu startup",
+        (false, false) => "desktopicon startmenu",
     }
 }
 
@@ -1568,6 +1579,7 @@ fn get_after_install(
     reg_value_start_menu_shortcuts: Option<String>,
     reg_value_desktop_shortcuts: Option<String>,
     reg_value_printer: Option<String>,
+    reg_value_startup: Option<String>,
 ) -> String {
     let app_name = crate::get_app_name();
     let ext = app_name.to_lowercase();
@@ -1599,6 +1611,35 @@ fn get_after_install(
             )
         })
         .unwrap_or_default();
+    let reg_startup = reg_value_startup
+        .as_ref()
+        .map(|v| {
+            format!(
+                "reg add HKEY_CLASSES_ROOT\\.{ext} /f /v {REG_NAME_INSTALL_STARTUP} /t REG_SZ /d \"{v}\""
+            )
+        })
+        .unwrap_or_default();
+    let install_startup = reg_value_startup
+        .as_deref()
+        .map(|value| value == "1")
+        .unwrap_or_else(|| {
+            get_reg_of_hkcr(&format!(".{ext}"), REG_NAME_INSTALL_STARTUP).as_deref() == Some("1")
+        })
+        && !config::is_outgoing_only();
+    let service_firewall = if install_startup {
+        format!(
+            "netsh advfirewall firewall add rule name=\"{app_name} Service\" dir=out action=allow program=\"{exe}\" enable=yes\nnetsh advfirewall firewall add rule name=\"{app_name} Service\" dir=in action=allow program=\"{exe}\" enable=yes"
+        )
+    } else {
+        format!(
+            "netsh advfirewall firewall delete rule name=\"{app_name} Service\"\nsc stop {app_name}\nsc delete {app_name}"
+        )
+    };
+    let create_service = if install_startup {
+        get_create_service(&exe)
+    } else {
+        String::new()
+    };
 
     format!("
     chcp 65001
@@ -1606,6 +1647,7 @@ fn get_after_install(
     {desktop_shortcuts}
     {start_menu_shortcuts}
     {reg_printer}
+    {reg_startup}
     reg add HKEY_CLASSES_ROOT\\.{ext}\\DefaultIcon /f
     reg add HKEY_CLASSES_ROOT\\.{ext}\\DefaultIcon /f /ve /t REG_SZ  /d \"\\\"{nested_exe}\\\",0\"
     reg add HKEY_CLASSES_ROOT\\.{ext}\\shell /f
@@ -1618,11 +1660,10 @@ fn get_after_install(
     reg add HKEY_CLASSES_ROOT\\{ext}\\shell\\open /f
     reg add HKEY_CLASSES_ROOT\\{ext}\\shell\\open\\command /f
     reg add HKEY_CLASSES_ROOT\\{ext}\\shell\\open\\command /f /ve /t REG_SZ /d \"\\\"{nested_exe}\\\" \\\"%%1\\\"\"
-    netsh advfirewall firewall add rule name=\"{app_name} Service\" dir=out action=allow program=\"{exe}\" enable=yes
-    netsh advfirewall firewall add rule name=\"{app_name} Service\" dir=in action=allow program=\"{exe}\" enable=yes
+    {service_firewall}
     {create_service}
     reg add HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System /f /v SoftwareSASGeneration /t REG_DWORD /d 1
-    ", create_service=get_create_service(&exe))
+    ")
 }
 
 pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> ResultType<()> {
@@ -1684,8 +1725,15 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
         shortcut_bytes(&exe, Some("--uninstall"), Some("msiexec.exe"))?,
         &format!("Uninstall {app_name}.lnk"),
     )?;
-    let (tray_shortcut_commands, tray_shortcut_file) =
-        staged_tray_shortcut_commands(&app_name, &exe, shortcut_icon_location.as_deref())?;
+    let install_startup =
+        options.split_whitespace().any(|option| option == "startup") && !config::is_outgoing_only();
+    let (tray_shortcut_commands, tray_shortcut_file) = if install_startup {
+        let (commands, file) =
+            staged_tray_shortcut_commands(&app_name, &exe, shortcut_icon_location.as_deref())?;
+        (commands, Some(file))
+    } else {
+        (String::new(), None)
+    };
     let mut reg_value_desktop_shortcuts = "0".to_owned();
     let mut reg_value_start_menu_shortcuts = "0".to_owned();
     let mut reg_value_printer = "0".to_owned();
@@ -1740,13 +1788,12 @@ if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} 
         Config::set_option("api-server".into(), lic.api);
     }
 
-    let tray_shortcuts = if config::is_outgoing_only() {
-        "".to_owned()
+    let tray_shortcuts = if install_startup {
+        format!(
+            "{tray_shortcut_commands}\ncopy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\""
+        )
     } else {
-        format!("
-{tray_shortcut_commands}
-copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
-")
+        format!("if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\" del /f /q \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\"")
     };
 
     let install_remote_printer = if install_printer {
@@ -1764,12 +1811,17 @@ copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\
         Some(reg_value_start_menu_shortcuts),
         Some(reg_value_desktop_shortcuts),
         Some(reg_value_printer),
+        Some(if install_startup { "1" } else { "0" }.to_owned()),
     );
-    let after_install = native_after_install_commands(
-        format!("{after_install}\r\n{install_remote_printer}"),
-        &exe,
-        true,
-    )?;
+    let after_install = if install_startup {
+        native_after_install_commands(
+            format!("{after_install}\r\n{install_remote_printer}"),
+            &exe,
+            true,
+        )?
+    } else {
+        format!("{after_install}\r\n{install_remote_printer}")
+    };
     // Remember to check if `update_me` need to be changed if changing the `cmds`.
     // No need to merge the existing dup code, because the code in these two functions are too critical.
     // New code should be written in a common function.
@@ -1815,7 +1867,10 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
     run_cmds(
         InstallCommands {
             script: cmds,
-            files: vec![mk_shortcut_file, uninstall_shortcut_file, tray_shortcut_file],
+            files: vec![mk_shortcut_file, uninstall_shortcut_file]
+                .into_iter()
+                .chain(tray_shortcut_file)
+                .collect(),
         },
         debug,
         "install",
@@ -1826,11 +1881,17 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
 
 pub fn run_after_install() -> ResultType<()> {
     let (_, _, _, exe) = get_install_info();
-    run_cmds(
-        native_after_install_commands(get_after_install(&exe, None, None, None), &exe, false)?,
-        true,
-        "after_install",
-    )
+    let subkey = format!(".{}", crate::get_app_name().to_lowercase());
+    let install_startup =
+        get_reg_of_hkcr(&subkey, REG_NAME_INSTALL_STARTUP).as_deref() == Some("1")
+        && !config::is_outgoing_only();
+    let commands = get_after_install(&exe, None, None, None, None);
+    let commands = if install_startup {
+        native_after_install_commands(commands, &exe, false)?
+    } else {
+        commands
+    };
+    run_cmds(commands, true, "after_install")
 }
 
 pub fn run_before_uninstall() -> ResultType<()> {
@@ -2452,85 +2513,12 @@ pub fn elevate(arg: &str) -> ResultType<bool> {
     )
 }
 
-pub fn run_as_system(arg: &str) -> ResultType<()> {
-    let exe = std::env::current_exe()?.to_string_lossy().to_string();
-    if impersonate_system::run_as_system(&exe, arg).is_err() {
-        bail!(format!("Failed to run {} as system", exe));
-    }
-    Ok(())
-}
-
-pub fn elevate_or_run_as_system(is_setup: bool, is_elevate: bool, is_run_as_system: bool) {
-    // avoid possible run recursively due to failed run.
-    log::info!(
-        "elevate: {} -> {:?}, run_as_system: {} -> {}",
-        is_elevate,
-        is_elevated(None),
-        is_run_as_system,
-        crate::username(),
-    );
-    let mut arg_elevate = if is_setup {
-        "--noinstall --elevate"
-    } else {
-        "--elevate"
-    }
-    .to_owned();
-    let mut arg_run_as_system = if is_setup {
-        "--noinstall --run-as-system"
-    } else {
-        "--run-as-system"
-    }
-    .to_owned();
-    let shmem_name_from_args = crate::portable_service::portable_service_shmem_name_from_args();
-    if shmem_name_from_args.is_none() && crate::portable_service::has_portable_service_shmem_arg() {
-        log::error!("Invalid portable service shared memory argument, aborting elevation flow");
-        // This is a malformed bootstrap argument in a privilege-sensitive path.
-        // Keep fail-closed process termination here to avoid continuing elevation
-        // with inconsistent shared-memory contract.
-        std::process::exit(1);
-    }
-    if let Some(shmem_name) = shmem_name_from_args {
-        let shmem_arg = crate::portable_service::portable_service_shmem_arg(&shmem_name);
-        arg_elevate.push(' ');
-        arg_elevate.push_str(&shmem_arg);
-        arg_run_as_system.push(' ');
-        arg_run_as_system.push_str(&shmem_arg);
-    }
-    if is_root() {
-        if is_run_as_system {
-            log::info!("run portable service");
-            crate::portable_service::server::run_portable_service();
-        }
-    } else {
-        match is_elevated(None) {
-            Ok(elevated) => {
-                if elevated {
-                    if !is_run_as_system {
-                        if run_as_system(arg_run_as_system.as_str()).is_ok() {
-                            std::process::exit(0);
-                        } else {
-                            log::error!(
-                                "Failed to run as system, error {}",
-                                io::Error::last_os_error()
-                            );
-                        }
-                    }
-                } else {
-                    if !is_elevate {
-                        if let Ok(true) = elevate(arg_elevate.as_str()) {
-                            std::process::exit(0);
-                        } else {
-                            log::error!("Failed to elevate, error {}", io::Error::last_os_error());
-                        }
-                    }
-                }
-            }
-            Err(_) => log::error!(
-                "Failed to get elevation status, error {}",
-                io::Error::last_os_error()
-            ),
-        }
-    }
+pub fn elevate_or_run_as_system(_is_setup: bool, _is_elevate: bool, _is_run_as_system: bool) {
+    // SOLUDESK policy: never bypass UAC or impersonate NT AUTHORITY\SYSTEM.
+    // Administrative tasks must be performed by the user through normal Windows UAC.
+    log::warn!("Elevated/portable service mode is disabled by SOLUDESK security policy");
+    message_box("Este modo de elevação não está disponível no SOLUDESK.\n\n"
+        .to_owned().as_str());
 }
 
 pub fn is_elevated(process_id: Option<DWORD>) -> ResultType<bool> {
@@ -3383,15 +3371,33 @@ fn get_install_service_commands(path: &str, exe: &str) -> ResultType<InstallComm
     if let Some(icon) = shortcut_icon_location.as_deref() {
         validate_install_value(icon)?;
     }
-    let (tray_shortcut_commands, tray_shortcut_file) =
-        staged_tray_shortcut_commands(&app_name, exe, shortcut_icon_location.as_deref())?;
+    let subkey = format!(".{}", app_name.to_lowercase());
+    let install_startup = get_reg_of_hkcr(&subkey, REG_NAME_INSTALL_STARTUP).as_deref()
+        == Some("1")
+        && !config::is_outgoing_only();
+    let (tray_shortcuts, tray_shortcut_file) = if install_startup {
+        let (commands, file) =
+            staged_tray_shortcut_commands(&app_name, exe, shortcut_icon_location.as_deref())?;
+        (
+            format!(
+                "{commands}\ncopy /Y \"%RUSTDESK_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\""
+            ),
+            Some(file),
+        )
+    } else {
+        (
+            format!(
+                "if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\" del /f /q \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\""
+            ),
+            None,
+        )
+    };
     let filter = format!(" /FI \"PID ne {}\"", get_current_pid());
     let script = format!(
         "
 chcp 65001
 taskkill /F /IM {app_name}.exe{filter}
-{tray_shortcut_commands}
-copy /Y \"%RUSTDESK_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
+{tray_shortcuts}
 {import_config}
 {create_service}
     ",
@@ -3400,7 +3406,7 @@ copy /Y \"%RUSTDESK_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsof
     );
     Ok(InstallCommands {
         script,
-        files: vec![tray_shortcut_file],
+        files: tray_shortcut_file.into_iter().collect(),
     })
 }
 

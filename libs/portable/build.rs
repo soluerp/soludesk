@@ -3,7 +3,7 @@ fn main() {
     {
         use std::io::Write;
         let mut res = winres::WindowsResource::new();
-        res.set_icon("../../res/icon.ico")
+        res.set_icon("../../flutter/windows/runner/resources/app_icon.ico")
             .set_language(winapi::um::winnt::MAKELANGID(
                 winapi::um::winnt::LANG_ENGLISH,
                 winapi::um::winnt::SUBLANG_ENGLISH_US,

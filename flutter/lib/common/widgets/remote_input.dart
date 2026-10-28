@@ -13,6 +13,9 @@ import 'package:flutter_hbb/models/input_model.dart';
 
 import './gestures.dart';
 
+const _traceSoludeskKeyboard =
+    bool.fromEnvironment('SOLUDESK_TRACE_KEYBOARD', defaultValue: false);
+
 class RawKeyFocusScope extends StatelessWidget {
   final FocusNode? focusNode;
   final ValueChanged<bool>? onFocusChange;
@@ -45,8 +48,13 @@ class RawKeyFocusScope extends StatelessWidget {
                 : null,
             onKeyEvent: useRawKeyEvents
                 ? null
-                : (FocusNode node, KeyEvent event) =>
-                    inputModel.handleKeyEvent(event),
+                : (FocusNode node, KeyEvent event) {
+                    if (_traceSoludeskKeyboard) {
+                      debugPrint(
+                          '[SOLUDESK_KEY_TRACE] stage=focus event=${event.runtimeType} primaryFocus=${node.hasPrimaryFocus}');
+                    }
+                    return inputModel.handleKeyEvent(event);
+                  },
             child: child));
   }
 }

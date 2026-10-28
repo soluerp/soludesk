@@ -285,9 +285,16 @@ class _PeerCardState extends State<_PeerCard>
     final name = hideUsernameOnCard == true
         ? peer.hostname
         : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}';
+    final isRecent = widget.tab == PeerTabIndex.recent;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final child = Card(
       color: Colors.transparent,
-      elevation: 0,
+      elevation: isRecent ? 12 : 0,
+      shadowColor: isDark ? const Color(0x883B82F6) : const Color(0x66182B44),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(_cardRadius),
+      ),
       margin: EdgeInsets.zero,
       // to-do: memory leak here, more investigation needed.
       // Continious rebuilds of `Obx()` will cause memory leak here.

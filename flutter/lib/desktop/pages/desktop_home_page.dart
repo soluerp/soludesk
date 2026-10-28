@@ -33,6 +33,12 @@ class DesktopHomePage extends StatefulWidget {
 }
 
 const borderColor = Color(0xFF2F65BA);
+const Color _sidebarBackground = Color(0xFF091C4C);
+const Color _sidebarSurface = Color(0xFF10265C);
+const Color _sidebarText = Color(0xFFF4F7FF);
+const Color _sidebarMutedText = Color(0xFFBFCDE8);
+const Color _sidebarDivider = Color(0xFF263D70);
+const Color _brandAqua = Color(0xFF21BFB9);
 
 class _DesktopHomePageState extends State<DesktopHomePage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
@@ -78,16 +84,70 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget buildLeftPane(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
     final isOutgoingOnly = bind.isOutgoingOnly();
+    final theme = Theme.of(context);
+    final sidebarTheme = theme.copyWith(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: _sidebarBackground,
+      colorScheme: theme.colorScheme.copyWith(
+        brightness: Brightness.dark,
+        surface: _sidebarBackground,
+        onSurface: _sidebarText,
+      ),
+      textTheme: theme.textTheme.apply(
+        bodyColor: _sidebarText,
+        displayColor: _sidebarText,
+      ),
+      iconTheme: const IconThemeData(color: _sidebarText),
+      dividerColor: _sidebarDivider,
+    );
     final children = <Widget>[
       if (!isOutgoingOnly) buildPresetPasswordWarning(),
-      if (bind.isCustomClient())
-        Align(
-          alignment: Alignment.center,
-          child: loadPowered(context),
-        ),
       Align(
         alignment: Alignment.center,
-        child: loadLogo(),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            const SizedBox(width: 10),
+            Image.asset(
+              'assets/icon.png',
+              width: 40,
+              height: 40,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AutoSizeText.rich(
+                    TextSpan(
+                      style: const TextStyle(
+                        fontFamily: 'SoludeskRounded',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0.25,
+                      ),
+                      children: [
+                        TextSpan(
+                            text: 'SOLU',
+                            style: const TextStyle(color: _sidebarText)),
+                        TextSpan(
+                            text: 'DESK',
+                            style: const TextStyle(color: _brandAqua)),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    minFontSize: 12,
+                    maxFontSize: 22,
+                    stepGranularity: 0.5,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       buildTip(context),
       if (!isOutgoingOnly) buildIDBoard(context),
@@ -113,7 +173,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     ];
     if (isIncomingOnly) {
       children.addAll([
-        Divider(),
+        const Divider(color: _sidebarDivider),
         OnlineStatusWidget(
           onSvcStatusChanged: () {
             if (isInHomePage()) {
@@ -125,54 +185,86 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         ).marginOnly(bottom: 6, right: 6)
       ]);
     }
-    final textColor = Theme.of(context).textTheme.titleLarge?.color;
-    return ChangeNotifierProvider.value(
-      value: gFFI.serverModel,
-      child: Container(
-        width: isIncomingOnly ? 280.0 : 200.0,
-        color: Theme.of(context).colorScheme.background,
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                SingleChildScrollView(
-                  controller: _leftPaneScrollController,
-                  child: Column(
-                    key: _childKey,
-                    children: children,
-                  ),
-                ),
-                Expanded(child: Container())
-              ],
-            ),
-            if (isOutgoingOnly)
-              Positioned(
-                bottom: 6,
-                left: 12,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: InkWell(
-                    child: Obx(
-                      () => Icon(
-                        Icons.settings,
-                        color: _editHover.value
-                            ? textColor
-                            : Colors.grey.withOpacity(0.5),
-                        size: 22,
+    final textColor = _sidebarText;
+    return Theme(
+      data: sidebarTheme,
+      child: ChangeNotifierProvider.value(
+        value: gFFI.serverModel,
+        child: Container(
+          width: isIncomingOnly ? 280.0 : 200.0,
+          color: _sidebarBackground,
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: _leftPaneScrollController,
+                      child: Column(
+                        key: _childKey,
+                        children: children,
                       ),
                     ),
-                    onTap: () => {
-                      if (DesktopSettingPage.tabKeys.isNotEmpty)
-                        {
-                          DesktopSettingPage.switch2page(
-                              DesktopSettingPage.tabKeys[0])
-                        }
-                    },
-                    onHover: (value) => _editHover.value = value,
                   ),
-                ),
-              )
-          ],
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12, bottom: 12),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                            width: 38, height: 38),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: theme.brightness == Brightness.dark
+                            ? 'Usar tema claro'
+                            : 'Usar tema escuro',
+                        onPressed: isOptionFixed(kCommConfKeyTheme)
+                            ? null
+                            : () => MyTheme.changeDarkMode(
+                                  theme.brightness == Brightness.dark
+                                      ? ThemeMode.light
+                                      : ThemeMode.dark,
+                                ),
+                        icon: Icon(
+                          theme.brightness == Brightness.dark
+                              ? Icons.light_mode_outlined
+                              : Icons.dark_mode_outlined,
+                          color: _sidebarText,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (isOutgoingOnly)
+                Positioned(
+                  bottom: 6,
+                  left: 12,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: InkWell(
+                      child: Obx(
+                        () => Icon(
+                          Icons.settings,
+                          color: _editHover.value
+                              ? textColor
+                              : Colors.grey.withOpacity(0.5),
+                          size: 22,
+                        ),
+                      ),
+                      onTap: () => {
+                        if (DesktopSettingPage.tabKeys.isNotEmpty)
+                          {
+                            DesktopSettingPage.switch2page(
+                                DesktopSettingPage.tabKeys[0])
+                          }
+                      },
+                      onHover: (value) => _editHover.value = value,
+                    ),
+                  ),
+                )
+            ],
+          ),
         ),
       ),
     );
@@ -212,13 +304,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       children: [
                         Text(
                           translate("ID"),
-                          style: TextStyle(
-                              fontSize: 14,
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.color
-                                  ?.withOpacity(0.5)),
+                          style: const TextStyle(
+                              fontSize: 14, color: _sidebarMutedText),
                         ).marginOnly(top: 5),
                         buildPopupMenu(context)
                       ],
@@ -235,12 +322,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                         controller: model.serverId,
                         readOnly: true,
                         decoration: InputDecoration(
+                          filled: true,
+                          fillColor: _sidebarBackground,
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.only(top: 10, bottom: 10),
                         ),
-                        style: TextStyle(
-                          fontSize: 22,
-                        ),
+                        style:
+                            const TextStyle(fontSize: 22, color: _sidebarText),
                       ).workaroundFreezeLinuxMint(),
                     ),
                   )
@@ -254,7 +342,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildPopupMenu(BuildContext context) {
-    final textColor = Theme.of(context).textTheme.titleLarge?.color;
+    const textColor = _sidebarText;
     RxBool hover = false.obs;
     return InkWell(
       onTap: DesktopTabPage.onAddSetting,
@@ -263,13 +351,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         child: Obx(
           () => CircleAvatar(
             radius: 15,
-            backgroundColor: hover.value
-                ? Theme.of(context).scaffoldBackgroundColor
-                : Theme.of(context).colorScheme.background,
+            backgroundColor: hover.value ? _sidebarSurface : _sidebarBackground,
             child: Icon(
               Icons.more_vert_outlined,
               size: 20,
-              color: hover.value ? textColor : textColor?.withOpacity(0.5),
+              color: hover.value ? textColor : textColor.withOpacity(0.5),
             ),
           ),
         ),
@@ -291,7 +377,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   buildPasswordBoard2(BuildContext context, ServerModel model) {
     RxBool refreshHover = false.obs;
     RxBool editHover = false.obs;
-    final textColor = Theme.of(context).textTheme.titleLarge?.color;
+    const textColor = _sidebarText;
     final showOneTime = model.approveMode != 'click' &&
         model.verificationMethod != kUsePermanentPassword;
     return Container(
@@ -313,8 +399,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 children: [
                   AutoSizeText(
                     translate("One-time Password"),
-                    style: TextStyle(
-                        fontSize: 14, color: textColor?.withOpacity(0.5)),
+                    style:
+                        const TextStyle(fontSize: 14, color: _sidebarMutedText),
                     maxLines: 1,
                   ),
                   Row(
@@ -332,11 +418,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                             controller: model.serverPasswd,
                             readOnly: true,
                             decoration: InputDecoration(
+                              filled: true,
+                              fillColor: _sidebarBackground,
                               border: InputBorder.none,
                               contentPadding:
                                   EdgeInsets.only(top: 14, bottom: 10),
                             ),
-                            style: TextStyle(fontSize: 15),
+                            style: const TextStyle(
+                                fontSize: 15, color: _sidebarText),
                           ).workaroundFreezeLinuxMint(),
                         ),
                       ),
@@ -402,7 +491,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                   alignment: Alignment.centerLeft,
                   child: Text(
                     translate("Your Desktop"),
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: const TextStyle(fontSize: 19, color: _sidebarText),
                   ),
                 ),
             ],
@@ -414,13 +503,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             Text(
               translate("desk_tip"),
               overflow: TextOverflow.clip,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: const TextStyle(
+                  fontSize: 12, color: _sidebarMutedText, height: 1.25),
             ),
           if (isOutgoingOnly)
             Text(
               translate("outgoing_only_desk_tip"),
               overflow: TextOverflow.clip,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: const TextStyle(
+                  fontSize: 12, color: _sidebarMutedText, height: 1.25),
             ),
         ],
       ),
@@ -607,15 +698,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           margin: EdgeInsets.fromLTRB(
               0, marginTop, 0, bind.isIncomingOnly() ? marginTop : 0),
           child: Container(
-              decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color.fromARGB(255, 226, 66, 188),
-                  Color.fromARGB(255, 244, 114, 124),
-                ],
-              )),
+              decoration: const BoxDecoration(color: _sidebarSurface),
               padding: EdgeInsets.all(20),
               child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -769,7 +852,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
     bool isChattyMethod(String methodName) {
       switch (methodName) {
-        case kWindowBumpMouse: return true;
+        case kWindowBumpMouse:
+          return true;
       }
 
       return false;
@@ -778,7 +862,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     rustDeskWinManager.setMethodHandler((call, fromWindowId) async {
       if (!isChattyMethod(call.method)) {
         debugPrint(
-          "[Main] call ${call.method} with args ${call.arguments} from window $fromWindowId");
+            "[Main] call ${call.method} with args ${call.arguments} from window $fromWindowId");
       }
       if (call.method == kWindowMainWindowOnTop) {
         windowOnTop(null);
@@ -806,9 +890,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           connToken: call.arguments['connToken'],
         );
       } else if (call.method == kWindowBumpMouse) {
-        return RdPlatformChannel.instance.bumpMouse(
-          dx: call.arguments['dx'],
-          dy: call.arguments['dy']);
+        return RdPlatformChannel.instance
+            .bumpMouse(dx: call.arguments['dx'], dy: call.arguments['dy']);
       } else if (call.method == kWindowEventMoveTabToNewWindow) {
         final args = call.arguments.split(',');
         int? windowId;

@@ -433,6 +433,7 @@ void registerSessionShortcutActions(
       )) {
         return;
       }
+      await bind.sessionClose(sessionId: ffi.sessionId);
       tabController.closeBy(ffi.id);
     });
   }

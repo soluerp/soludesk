@@ -188,18 +188,6 @@ pub fn core_main() -> Option<CoreMainAction> {
     }
 
     #[cfg(windows)]
-    if !crate::platform::is_installed()
-        && args.is_empty()
-        && _is_quick_support
-        && !_is_elevate
-        && !_is_run_as_system
-    {
-        use crate::portable_service::client;
-        if let Err(e) = client::start_portable_service(client::StartPara::Direct) {
-            log::error!("Failed to start portable service: {:?}", e);
-        }
-    }
-    #[cfg(windows)]
     if !crate::platform::is_installed() && (_is_elevate || _is_run_as_system) {
         crate::platform::elevate_or_run_as_system(click_setup, _is_elevate, _is_run_as_system);
         return None;
@@ -235,10 +223,9 @@ pub fn core_main() -> Option<CoreMainAction> {
         {
             use crate::platform;
             if args[0] == "--uninstall" {
-                if let Err(err) = platform::uninstall_me(true) {
-                    log::error!("Failed to uninstall: {}", err);
-                }
-                return None;
+                // Let Flutter show the branded confirmation screen before
+                // invoking the elevated Windows uninstaller.
+                flutter_args.push("--uninstall".to_owned());
             } else if args[0] == "--update" {
                 // The elevated updater cannot delete its running verified copy.
                 if let Err(err) = platform::schedule_current_verified_update_file_cleanup() {

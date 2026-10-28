@@ -1631,6 +1631,10 @@ class RustdeskImpl {
     throw UnimplementedError("installInstallMe");
   }
 
+  Future<void> installUninstallMe({dynamic hint}) {
+    throw UnimplementedError("installUninstallMe");
+  }
+
   String installInstallPath({dynamic hint}) {
     throw UnimplementedError("installInstallPath");
   }
@@ -1930,8 +1934,8 @@ class RustdeskImpl {
   String mainGetCommonSync({required String key, dynamic hint}) {
     const prefix = 'resolve-api-server:';
     if (key.startsWith(prefix)) {
-      return js.context
-          .callMethod('getByName', ['api_server', key.substring(prefix.length)]);
+      return js.context.callMethod(
+          'getByName', ['api_server', key.substring(prefix.length)]);
     }
     throw UnimplementedError("mainGetCommonSync");
   }
@@ -1947,12 +1951,15 @@ class RustdeskImpl {
   }
 
   Future<void> sessionSetCommon(
-      {required UuidValue sessionId, required String key, required String value, dynamic hint}) {
-      js.context.callMethod('setByName', [
-        'common',
-        jsonEncode({'name': key, 'value': value})
-      ]);
-      return Future.value();
+      {required UuidValue sessionId,
+      required String key,
+      required String value,
+      dynamic hint}) {
+    js.context.callMethod('setByName', [
+      'common',
+      jsonEncode({'name': key, 'value': value})
+    ]);
+    return Future.value();
   }
 
   String? sessionGetCommonSync(

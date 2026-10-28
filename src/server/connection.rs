@@ -961,9 +961,7 @@ impl Connection {
                         }
                         #[cfg(windows)]
                         ipc::Data::DataPortableService(ipc::DataPortableService::RequestStart) => {
-                            if let Err(e) = portable_client::start_portable_service(portable_client::StartPara::Direct) {
-                                log::error!("Failed to start portable service from cm: {:?}", e);
-                            }
+                            log::warn!("Portable service start rejected by SOLUDESK security policy");
                         }
                         #[cfg(feature = "flutter")]
                         #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -4670,21 +4668,11 @@ impl Connection {
     }
 
     #[cfg(windows)]
-    async fn handle_elevation_request(&mut self, para: portable_client::StartPara) {
-        let mut err;
-        if !self.keyboard {
-            err = "No permission".to_string();
-        } else {
-            err = "No need to elevate".to_string();
-            if !crate::platform::is_installed() && !portable_client::running() {
-                err = portable_client::start_portable_service(para)
-                    .err()
-                    .map_or("".to_string(), |e| e.to_string());
-            }
-        }
-
+    async fn handle_elevation_request(&mut self, _para: portable_client::StartPara) {
         let mut misc = Misc::new();
-        misc.set_elevation_response(err);
+        misc.set_elevation_response(
+            "Elevação remota desativada por política de segurança do SOLUDESK".to_string(),
+        );
         let mut msg = Message::new();
         msg.set_misc(misc);
         self.send(msg).await;

@@ -347,8 +347,17 @@ class _ConnectionPageState extends State<ConnectionPage>
       width: 320 + 20 * 2,
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
       decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(13)),
-          border: Border.all(color: Theme.of(context).colorScheme.background)),
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        border: Border.all(color: MyTheme.accent.withOpacity(0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: MyTheme.accent.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Ink(
         child: Column(
           children: [

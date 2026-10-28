@@ -1027,7 +1027,7 @@ class TemporaryPasswordLengthMenu: Reactor.Component {
         var is_opt_fixed = handler.is_option_fixed('temporary-password-length');
         var length = handler.get_option("temporary-password-length");
         var index = ['6', '8', '10'].indexOf(length);
-        if (index < 0) index = 0;
+        if (index < 0) index = 2;
         for (var (i, el) in this.$$(menu#temporary-password-length>li)) {
             el.attributes.toggleClass("selected", i == index);
             if (is_opt_fixed) {

@@ -660,6 +660,9 @@ impl Drop for CheckTestNatType {
 }
 
 pub fn test_nat_type() {
+    if Config::get_rendezvous_servers().is_empty() {
+        return;
+    }
     test_ipv6_sync();
     use std::sync::atomic::{AtomicBool, Ordering};
     std::thread::spawn(move || {
@@ -706,6 +709,9 @@ async fn test_nat_type_() -> ResultType<bool> {
     log::info!("Testing nat ...");
     let start = std::time::Instant::now();
     let server1 = Config::get_rendezvous_server();
+    if server1.is_empty() {
+        return Ok(false);
+    }
     let server2 = crate::increase_port(&server1, -1);
     let mut msg_out = RendezvousMessage::new();
     let serial = Config::get_serial();

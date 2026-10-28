@@ -149,7 +149,9 @@ if __name__ == '__main__':
         folder, options.level, exe if options.exclude_exe else None)
     if options.package:
         write_blob(md5_table, os.path.abspath(options.package), exe)
+        raise SystemExit(0)
     else:
         write_package_metadata(md5_table, output_folder, exe)
         write_app_metadata(output_folder)
         build_portable(output_folder, options.target)
+        raise SystemExit(0)

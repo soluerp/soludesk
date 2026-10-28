@@ -30,6 +30,21 @@ enum MouseButtons { left, right, wheel, back, forward }
 const _kMouseEventDown = 'mousedown';
 const _kMouseEventUp = 'mouseup';
 const _kMouseEventMove = 'mousemove';
+const _traceRemotePointer =
+    bool.fromEnvironment('SOLUDESK_TRACE_POINTER', defaultValue: false);
+const _traceSoludeskKeyboard =
+    bool.fromEnvironment('SOLUDESK_TRACE_KEYBOARD', defaultValue: false);
+int _lastRemotePointerMoveTraceMs = 0;
+
+bool _shouldTraceRemotePointer(dynamic eventType) {
+  if (!_traceRemotePointer) return false;
+  if (eventType == _kMouseEventDown || eventType == _kMouseEventUp) return true;
+  if (eventType != _kMouseEventMove) return false;
+  final now = DateTime.now().millisecondsSinceEpoch;
+  if (now - _lastRemotePointerMoveTraceMs < 250) return false;
+  _lastRemotePointerMoveTraceMs = now;
+  return true;
+}
 
 class CanvasCoords {
   double x = 0;
@@ -844,6 +859,10 @@ class InputModel {
   }
 
   KeyEventResult handleKeyEvent(KeyEvent e) {
+    if (_traceSoludeskKeyboard) {
+      debugPrint(
+          '[SOLUDESK_KEY_TRACE] stage=handler event=${e.runtimeType} permission=$keyboardPerm viewOnly=$isViewOnly sourceFlutter=$isInputSourceFlutter mode=$keyboardMode');
+    }
     if (_localFlutterShortcuts.tryDispatch(e)) return KeyEventResult.handled;
     if (isViewOnly) {
       if (isWeb && !isInputSourceFlutter) return KeyEventResult.ignored;
@@ -1240,6 +1259,10 @@ class InputModel {
   /// Send Key Event
   void newKeyboardMode(
       String character, int usbHid, bool down, bool iosCapsLock) {
+    if (_traceSoludeskKeyboard) {
+      debugPrint(
+          '[SOLUDESK_KEY_TRACE] stage=ffi_map down=$down permission=$keyboardPerm viewOnly=$isViewOnly');
+    }
     final lockModes = _buildLockModes(iosCapsLock);
     bind.sessionHandleFlutterKeyEvent(
         sessionId: sessionId,
@@ -1340,6 +1363,10 @@ class InputModel {
   /// [down] indicates the key's state(down or up).
   /// [press] indicates a click event(down and up).
   void inputKey(String name, {bool? down, bool? press}) {
+    if (_traceSoludeskKeyboard) {
+      debugPrint(
+          '[SOLUDESK_KEY_TRACE] stage=ffi_legacy down=${down ?? false} press=${press ?? true} permission=$keyboardPerm viewOnly=$isViewOnly');
+    }
     if (!keyboardPerm) return;
     if (isViewCamera) return;
     bind.sessionInputKey(
@@ -1627,7 +1654,8 @@ class InputModel {
       if (!_relativeMouse.handleRelativeMouseMove(e.localPosition)) {
         final canvasPosition = _pointerPositionForRemoteCanvas(e);
         handleMouse(_getMouseEvent(e, _kMouseEventMove), canvasPosition,
-            edgeScroll: useEdgeScroll);
+            edgeScroll: useEdgeScroll,
+            traceLocalOffset: isDesktop ? e.localPosition : null);
       }
     }
   }
@@ -1868,7 +1896,8 @@ class InputModel {
             .sendRelativeMouseButton(_getMouseEvent(e, _kMouseEventDown));
       } else {
         final canvasPosition = _pointerPositionForRemoteCanvas(e);
-        handleMouse(_getMouseEvent(e, _kMouseEventDown), canvasPosition);
+        handleMouse(_getMouseEvent(e, _kMouseEventDown), canvasPosition,
+            traceLocalOffset: isDesktop ? e.localPosition : null);
       }
     }
   }
@@ -1891,7 +1920,8 @@ class InputModel {
             .sendRelativeMouseButton(_getMouseEvent(e, _kMouseEventUp));
       } else {
         final canvasPosition = _pointerPositionForRemoteCanvas(e);
-        handleMouse(_getMouseEvent(e, _kMouseEventUp), canvasPosition);
+        handleMouse(_getMouseEvent(e, _kMouseEventUp), canvasPosition,
+            traceLocalOffset: isDesktop ? e.localPosition : null);
       }
     }
   }
@@ -1915,7 +1945,8 @@ class InputModel {
       if (!_relativeMouse.handleRelativeMouseMove(e.localPosition)) {
         final canvasPosition = _pointerPositionForRemoteCanvas(e);
         handleMouse(_getMouseEvent(e, _kMouseEventMove), canvasPosition,
-            edgeScroll: useEdgeScroll);
+            edgeScroll: useEdgeScroll,
+            traceLocalOffset: isDesktop ? e.localPosition : null);
       }
     }
   }
@@ -2134,11 +2165,13 @@ class InputModel {
   Map<String, dynamic>? processEventToPeer(
     Map<String, dynamic> evt,
     Offset offset, {
+    Offset? traceLocalOffset,
     bool onExit = false,
     bool moveCanvas = true,
     bool edgeScroll = false,
   }) {
     if (isViewCamera) return null;
+    final tracePointer = _shouldTraceRemotePointer(evt['type']);
     final buttons = evt['buttons'];
     final isMatchingMouseUp = (isDesktop || isWebDesktop) &&
         evt['type'] == _kMouseEventUp &&
@@ -2187,6 +2220,17 @@ class InputModel {
       moveCanvas: moveCanvas,
       edgeScroll: edgeScroll,
     );
+    if (tracePointer && (isDesktop || isWebDesktop)) {
+      final canvas = parent.target!.canvasModel;
+      debugPrint(
+          '[SOLUDESK pointer trace] input=${offset.dx.toStringAsFixed(1)},${offset.dy.toStringAsFixed(1)} '
+          'dpr=$devicePixelRatio canvas=${canvas.size.width.toStringAsFixed(1)}x${canvas.size.height.toStringAsFixed(1)} '
+          'origin=${canvas.x.toStringAsFixed(1)},${canvas.y.toStringAsFixed(1)} '
+          'scale=${canvas.scale.toStringAsFixed(4)} scroll=${canvas.scrollX.toStringAsFixed(3)},${canvas.scrollY.toStringAsFixed(3)} '
+          'local=${traceLocalOffset?.dx.toStringAsFixed(1)},${traceLocalOffset?.dy.toStringAsFixed(1)} '
+          'globalLocalDelta=${traceLocalOffset == null ? "n/a" : "${(offset.dx - traceLocalOffset.dx).toStringAsFixed(1)},${(offset.dy - traceLocalOffset.dy).toStringAsFixed(1)}"} '
+          'remoteRect=${parent.target!.ffiModel.rect} mapped=$pos event=$type');
+    }
     if (pos == null) {
       return null;
     }
@@ -2223,12 +2267,16 @@ class InputModel {
   Map<String, dynamic>? handleMouse(
     Map<String, dynamic> evt,
     Offset offset, {
+    Offset? traceLocalOffset,
     bool onExit = false,
     bool moveCanvas = true,
     bool edgeScroll = false,
   }) {
     final evtToPeer = processEventToPeer(evt, offset,
-        onExit: onExit, moveCanvas: moveCanvas, edgeScroll: edgeScroll);
+        traceLocalOffset: traceLocalOffset,
+        onExit: onExit,
+        moveCanvas: moveCanvas,
+        edgeScroll: edgeScroll);
     if (evtToPeer != null) {
       bind.sessionSendMouse(
           sessionId: sessionId, msg: json.encode(modify(evtToPeer)));

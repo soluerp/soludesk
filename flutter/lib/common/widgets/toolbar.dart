@@ -464,17 +464,7 @@ List<TTextMenu> toolbarControls(BuildContext context, String id, FFI ffi) {
   }
 
   List<TTextMenu> v = [];
-  // elevation
-  if (isDefaultConn &&
-      perms['keyboard'] != false &&
-      ffi.elevationModel.showRequestMenu) {
-    v.add(
-      TTextMenu(
-          child: Text(translate('Request Elevation')),
-          onPressed: () =>
-              showRequestElevationDialog(sessionId, ffi.dialogManager)),
-    );
-  }
+  // Remote elevation is disabled by SOLUDESK security policy.
   // osPassword
   if (isDefaultConn && perms['keyboard'] != false) {
     v.add(
@@ -808,26 +798,29 @@ Future<List<TRadioMenu<String>>> toolbarViewStyle(
         .then((_) => ffi.canvasModel.updateViewStyle());
   }
 
-  return _registerRadioMenuShortcuts(ffi, [
-    TRadioMenu<String>(
-        child: Text(translate('Scale original')),
-        value: kRemoteViewStyleOriginal,
-        groupValue: groupValue,
-        onChanged: onChanged,
-        actionId: kShortcutActionViewModeOriginal),
-    TRadioMenu<String>(
-        child: Text(translate('Scale adaptive')),
-        value: kRemoteViewStyleAdaptive,
-        groupValue: groupValue,
-        onChanged: onChanged,
-        actionId: kShortcutActionViewModeAdaptive),
-    TRadioMenu<String>(
-        child: Text(translate('Scale custom')),
-        value: kRemoteViewStyleCustom,
-        groupValue: groupValue,
-        onChanged: onChanged,
-        actionId: kShortcutActionViewModeCustom)
-  ], ownedActionIds: _kToolbarViewStyleActionIds);
+  return _registerRadioMenuShortcuts(
+      ffi,
+      [
+        TRadioMenu<String>(
+            child: Text(translate('Scale original')),
+            value: kRemoteViewStyleOriginal,
+            groupValue: groupValue,
+            onChanged: onChanged,
+            actionId: kShortcutActionViewModeOriginal),
+        TRadioMenu<String>(
+            child: Text(translate('Scale adaptive')),
+            value: kRemoteViewStyleAdaptive,
+            groupValue: groupValue,
+            onChanged: onChanged,
+            actionId: kShortcutActionViewModeAdaptive),
+        TRadioMenu<String>(
+            child: Text(translate('Scale custom')),
+            value: kRemoteViewStyleCustom,
+            groupValue: groupValue,
+            onChanged: onChanged,
+            actionId: kShortcutActionViewModeCustom)
+      ],
+      ownedActionIds: _kToolbarViewStyleActionIds);
 }
 
 Future<List<TRadioMenu<String>>> toolbarImageQuality(
@@ -839,35 +832,38 @@ Future<List<TRadioMenu<String>>> toolbarImageQuality(
     await bind.sessionSetImageQuality(sessionId: ffi.sessionId, value: value);
   }
 
-  return _registerRadioMenuShortcuts(ffi, [
-    TRadioMenu<String>(
-        child: Text(translate('Good image quality')),
-        value: kRemoteImageQualityBest,
-        groupValue: groupValue,
-        onChanged: onChanged,
-        actionId: kShortcutActionImageQualityBest),
-    TRadioMenu<String>(
-        child: Text(translate('Balanced')),
-        value: kRemoteImageQualityBalanced,
-        groupValue: groupValue,
-        onChanged: onChanged,
-        actionId: kShortcutActionImageQualityBalanced),
-    TRadioMenu<String>(
-        child: Text(translate('Optimize reaction time')),
-        value: kRemoteImageQualityLow,
-        groupValue: groupValue,
-        onChanged: onChanged,
-        actionId: kShortcutActionImageQualityLow),
-    TRadioMenu<String>(
-      child: Text(translate('Custom')),
-      value: kRemoteImageQualityCustom,
-      groupValue: groupValue,
-      onChanged: (value) {
-        onChanged(value);
-        customImageQualityDialog(ffi.sessionId, id, ffi);
-      },
-    ),
-  ], ownedActionIds: _kToolbarImageQualityActionIds);
+  return _registerRadioMenuShortcuts(
+      ffi,
+      [
+        TRadioMenu<String>(
+            child: Text(translate('Good image quality')),
+            value: kRemoteImageQualityBest,
+            groupValue: groupValue,
+            onChanged: onChanged,
+            actionId: kShortcutActionImageQualityBest),
+        TRadioMenu<String>(
+            child: Text(translate('Balanced')),
+            value: kRemoteImageQualityBalanced,
+            groupValue: groupValue,
+            onChanged: onChanged,
+            actionId: kShortcutActionImageQualityBalanced),
+        TRadioMenu<String>(
+            child: Text(translate('Optimize reaction time')),
+            value: kRemoteImageQualityLow,
+            groupValue: groupValue,
+            onChanged: onChanged,
+            actionId: kShortcutActionImageQualityLow),
+        TRadioMenu<String>(
+          child: Text(translate('Custom')),
+          value: kRemoteImageQualityCustom,
+          groupValue: groupValue,
+          onChanged: (value) {
+            onChanged(value);
+            customImageQualityDialog(ffi.sessionId, id, ffi);
+          },
+        ),
+      ],
+      ownedActionIds: _kToolbarImageQualityActionIds);
 }
 
 Future<List<TRadioMenu<String>>> toolbarCodec(
@@ -920,14 +916,19 @@ Future<List<TRadioMenu<String>>> toolbarCodec(
       ffi.qualityMonitorModel.data.codecFormat != null) {
     autoLabel = '$autoLabel (${ffi.qualityMonitorModel.data.codecFormat})';
   }
-  return _registerRadioMenuShortcuts(ffi, [
-    radio(autoLabel, 'auto', true, kShortcutActionCodecAuto),
-    if (codecs[0]) radio('VP8', 'vp8', codecs[0], kShortcutActionCodecVp8),
-    radio('VP9', 'vp9', true, kShortcutActionCodecVp9),
-    if (codecs[1]) radio('AV1', 'av1', codecs[1], kShortcutActionCodecAv1),
-    if (codecs[2]) radio('H264', 'h264', codecs[2], kShortcutActionCodecH264),
-    if (codecs[3]) radio('H265', 'h265', codecs[3], kShortcutActionCodecH265),
-  ], ownedActionIds: _kToolbarCodecActionIds);
+  return _registerRadioMenuShortcuts(
+      ffi,
+      [
+        radio(autoLabel, 'auto', true, kShortcutActionCodecAuto),
+        if (codecs[0]) radio('VP8', 'vp8', codecs[0], kShortcutActionCodecVp8),
+        radio('VP9', 'vp9', true, kShortcutActionCodecVp9),
+        if (codecs[1]) radio('AV1', 'av1', codecs[1], kShortcutActionCodecAv1),
+        if (codecs[2])
+          radio('H264', 'h264', codecs[2], kShortcutActionCodecH264),
+        if (codecs[3])
+          radio('H265', 'h265', codecs[3], kShortcutActionCodecH265),
+      ],
+      ownedActionIds: _kToolbarCodecActionIds);
 }
 
 Future<List<TToggleMenu>> toolbarCursor(
@@ -1444,7 +1445,8 @@ void registerToolbarShortcuts(BuildContext context, String id, FFI ffi) {
   register(_kToolbarCursorActionIds, () => toolbarCursor(context, id, ffi));
   register(_kToolbarDisplayToggleActionIds,
       () => toolbarDisplayToggle(context, id, ffi));
-  register(_kToolbarViewStyleActionIds, () => toolbarViewStyle(context, id, ffi));
+  register(
+      _kToolbarViewStyleActionIds, () => toolbarViewStyle(context, id, ffi));
   register(_kToolbarImageQualityActionIds,
       () => toolbarImageQuality(context, id, ffi));
   register(_kToolbarCodecActionIds, () => toolbarCodec(context, id, ffi));

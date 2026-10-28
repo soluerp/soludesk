@@ -175,6 +175,27 @@ lazy_static::lazy_static! {
 
 const PUBLIC_SERVER: &str = "public";
 
+fn public_server_addresses() -> ResultType<(String, Vec<String>)> {
+    let Some((primary, secondary)) = RENDEZVOUS_SERVERS.split_first() else {
+        bail!("O acesso pelo servidor público está desativado nesta versão do SOLUDESK.");
+    };
+    Ok((
+        check_port(primary, RENDEZVOUS_PORT),
+        secondary.iter().map(|server| server.to_string()).collect(),
+    ))
+}
+
+#[cfg(test)]
+mod soludesk_server_policy_tests {
+    use super::{public_server_addresses, RENDEZVOUS_SERVERS};
+
+    #[test]
+    fn public_server_alias_fails_closed_in_soludesk() {
+        assert!(RENDEZVOUS_SERVERS.is_empty());
+        assert!(public_server_addresses().is_err());
+    }
+}
+
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub fn get_key_state(key: enigo::Key) -> bool {
     use enigo::KeyboardControllable;
@@ -474,18 +495,17 @@ impl Client {
             crate::get_rendezvous_server(1_000).await
         } else {
             if other_server == PUBLIC_SERVER {
-                (
-                    check_port(RENDEZVOUS_SERVERS[0], RENDEZVOUS_PORT),
-                    RENDEZVOUS_SERVERS[1..]
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect(),
-                    true,
-                )
+                let (primary, secondary) = public_server_addresses()?;
+                (primary, secondary, true)
             } else {
                 (check_port(other_server, RENDEZVOUS_PORT), Vec::new(), true)
             }
         };
+        if rendezvous_server.is_empty() {
+            bail!(
+                "Servidor de identificação não configurado. Configure-o em Configurações > Rede."
+            );
+        }
 
         // Same relay gate as the v6 socket below: under any forced relay the v6 punch cannot
         // be used, so probing v6 reachability is wasted work on every such connection.
@@ -1689,10 +1709,9 @@ impl Client {
             Some(v) => v,
             None => {
                 // No trusted peer identity (key-less deployment, or a blob that does not verify
-                // under our root), so no fingerprint binding is possible. Fall through like TCP's
-                // non-secure path with is_secured() false: bailing would only move the session to
-                // a relay that fails the same check and then runs in plaintext.
-                // send an empty message out in case server is setting up secure and waiting for first message
+                // under our root), so no fingerprint binding is possible. Keep only the minimal
+                // handshake negotiation here; the session loop must close the connection if the
+                // resulting stream is not secured. Never proceed with remote-control data.
                 conn.send(&Message::new()).await?;
                 return Ok(option_pk);
             }
@@ -5008,25 +5027,13 @@ pub enum Data {
     TakeScreenshot((i32, String)),
 }
 
-pub async fn confirm_insecure_connection(
-    interface: &impl Interface,
-    receiver: &mut UnboundedReceiver<Data>,
-) -> bool {
+pub fn block_insecure_connection(interface: &impl Interface) {
     interface.msgbox(
-        "insecure-connection-nocancel-hasclose",
-        "Insecure Connection",
-        "conn-e2ee-unavailable-tip",
+        "error",
+        "Connection blocked",
+        "conn-e2ee-blocked-tip",
         "",
     );
-    while let Some(data) = receiver.recv().await {
-        match data {
-            Data::ContinueInsecureConnection => return true,
-            Data::RejectInsecureConnection => return false,
-            Data::Close => return false,
-            _ => {}
-        }
-    }
-    false
 }
 
 /// Keycode for key events.

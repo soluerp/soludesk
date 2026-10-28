@@ -124,6 +124,25 @@ pub fn install_me(_options: String, _path: String, _silent: bool, _debug: bool) 
 }
 
 #[inline]
+pub fn uninstall_me() {
+    #[cfg(windows)]
+    std::thread::spawn(move || {
+        if let Err(err) = crate::platform::windows::uninstall_me(true) {
+            log::error!("Uninstallation failed: {err:#}");
+            if !err
+                .downcast_ref::<::windows::core::Error>()
+                .is_some_and(|err| {
+                    err.code() == ::windows::Win32::Foundation::ERROR_CANCELLED.to_hresult()
+                })
+            {
+                crate::platform::windows::message_box(&format!("Uninstallation failed:\n{err:#}!"));
+            }
+        }
+        std::process::exit(0);
+    });
+}
+
+#[inline]
 pub fn update_me(_path: String) {
     goto_install();
 }

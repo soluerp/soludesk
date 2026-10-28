@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/widgets/overlay.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/pages/install_page.dart';
+import 'package:flutter_hbb/desktop/pages/uninstall_page.dart';
 import 'package:flutter_hbb/desktop/pages/server_page.dart';
 import 'package:flutter_hbb/desktop/screen/desktop_file_transfer_screen.dart';
 import 'package:flutter_hbb/desktop/screen/desktop_view_camera_screen.dart';
@@ -106,6 +107,8 @@ Future<void> main(List<String> args) async {
     runConnectionManagerScreen();
   } else if (args.contains('--install')) {
     runInstallPage();
+  } else if (args.contains('--uninstall')) {
+    runUninstallPage();
   } else {
     desktopType = DesktopType.main;
     await windowManager.ensureInitialized();
@@ -395,6 +398,20 @@ void runInstallPage() async {
     windowManager.focus();
     windowManager.setOpacity(1);
     windowManager.setAlignment(Alignment.center); // ensure
+  });
+}
+
+void runUninstallPage() async {
+  await windowManager.ensureInitialized();
+  await initEnv(kAppTypeMain);
+  _runApp('', const UninstallPage(), MyTheme.currentThemeMode());
+  final windowOptions =
+      getHiddenTitleBarWindowOptions(size: const Size(560, 360), center: true);
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    windowManager.show();
+    windowManager.focus();
+    windowManager.setOpacity(1);
+    windowManager.setAlignment(Alignment.center);
   });
 }
 
