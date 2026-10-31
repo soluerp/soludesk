@@ -29,7 +29,7 @@ native-windows-gui = {version = "1.0", default-features = false, features = ["an
 [package.metadata.winres]
 LegalCopyright = "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved."
 ProductName = "SOLUDESK"
-OriginalFilename = "SOLUDESK-1.0.0.exe"
+OriginalFilename = "SOLUDESK-1.0.1.exe"
 FileDescription = "SOLUDESK Remote Access"
 #ProductVersion = ""
 

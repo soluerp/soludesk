@@ -33,12 +33,15 @@ class DesktopHomePage extends StatefulWidget {
 }
 
 const borderColor = Color(0xFF2F65BA);
-const Color _sidebarBackground = Color(0xFF091C4C);
-const Color _sidebarSurface = Color(0xFF10265C);
+const Color _sidebarBackground = Color(0xFF0F2454);
+const Color _sidebarSurface = Color(0xFF16306B);
 const Color _sidebarText = Color(0xFFF4F7FF);
-const Color _sidebarMutedText = Color(0xFFBFCDE8);
+const Color _sidebarMutedText = Color(0xFF9FB2DA);
 const Color _sidebarDivider = Color(0xFF263D70);
 const Color _brandAqua = Color(0xFF21BFB9);
+const Color _statusReadyBg = Color(0xFF0B3B4A);
+const Color _statusReadyText = Color(0xFF5FE0D9);
+const String _monoFont = 'Consolas';
 
 class _DesktopHomePageState extends State<DesktopHomePage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
@@ -152,6 +155,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       buildTip(context),
       if (!isOutgoingOnly) buildIDBoard(context),
       if (!isOutgoingOnly) buildPasswordBoard(context),
+      if (!isOutgoingOnly && !isIncomingOnly) buildStatusPill(),
       FutureBuilder<Widget>(
         future: Future.value(
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
@@ -191,7 +195,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       child: ChangeNotifierProvider.value(
         value: gFFI.serverModel,
         child: Container(
-          width: isIncomingOnly ? 280.0 : 200.0,
+          width: isIncomingOnly ? 280.0 : 240.0,
           color: _sidebarBackground,
           child: Stack(
             children: [
@@ -280,16 +284,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   buildIDBoard(BuildContext context) {
     final model = gFFI.serverModel;
     return Container(
-      margin: const EdgeInsets.only(left: 20, right: 11),
-      height: 57,
+      margin: const EdgeInsets.only(left: 18, right: 11, top: 6),
+      height: 62,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
-          Container(
-            width: 2,
-            decoration: const BoxDecoration(color: MyTheme.accent),
-          ).marginOnly(top: 5),
+          const SizedBox(width: 0).marginOnly(top: 5),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(left: 7),
@@ -302,10 +303,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          translate("ID"),
-                          style: const TextStyle(
-                              fontSize: 14, color: _sidebarMutedText),
+                        const Text(
+                          'Seu ID',
+                          style: TextStyle(
+                              fontSize: 12, color: _sidebarMutedText),
                         ).marginOnly(top: 5),
                         buildPopupMenu(context)
                       ],
@@ -327,8 +328,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.only(top: 10, bottom: 10),
                         ),
-                        style:
-                            const TextStyle(fontSize: 22, color: _sidebarText),
+                        style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: _monoFont,
+                            letterSpacing: 1.5,
+                            color: _sidebarText),
                       ).workaroundFreezeLinuxMint(),
                     ),
                   )
@@ -381,16 +386,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     final showOneTime = model.approveMode != 'click' &&
         model.verificationMethod != kUsePermanentPassword;
     return Container(
-      margin: EdgeInsets.only(left: 20.0, right: 16, top: 13, bottom: 13),
+      margin: EdgeInsets.only(left: 18.0, right: 16, top: 8, bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
-          Container(
-            width: 2,
-            height: 52,
-            decoration: BoxDecoration(color: MyTheme.accent),
-          ),
+          const SizedBox(width: 0, height: 52),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(left: 7),
@@ -398,9 +399,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AutoSizeText(
-                    translate("One-time Password"),
+                    'Senha de uso único',
                     style:
-                        const TextStyle(fontSize: 14, color: _sidebarMutedText),
+                        const TextStyle(fontSize: 12, color: _sidebarMutedText),
                     maxLines: 1,
                   ),
                   Row(
@@ -425,7 +426,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                   EdgeInsets.only(top: 14, bottom: 10),
                             ),
                             style: const TextStyle(
-                                fontSize: 15, color: _sidebarText),
+                                fontSize: 16,
+                                fontFamily: _monoFont,
+                                letterSpacing: 1,
+                                color: _sidebarText),
                           ).workaroundFreezeLinuxMint(),
                         ),
                       ),
@@ -440,7 +444,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                   Icons.refresh,
                                   color: refreshHover.value
                                       ? textColor
-                                      : Color(0xFFDDDDDD),
+                                      : _brandAqua,
                                   size: 22,
                                 ))),
                           ),
@@ -475,6 +479,51 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  Widget buildStatusPill() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Obx(() {
+        final status = stateGlobal.svcStatus.value;
+        final ready = status == SvcStatus.ready;
+        final label = ready
+            ? 'Pronto para receber'
+            : status == SvcStatus.connecting
+                ? 'Conectando ao servidor'
+                : 'Sem conexão com o servidor';
+        final dot = ready
+            ? _brandAqua
+            : status == SvcStatus.connecting
+                ? kColorWarn
+                : const Color(0xFFE04F5F);
+        return Container(
+          margin: const EdgeInsets.only(left: 18, top: 4, bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: ready ? _statusReadyBg : _sidebarSurface,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: ready ? _statusReadyText : _sidebarMutedText),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
   buildTip(BuildContext context) {
     final isOutgoingOnly = bind.isOutgoingOnly();
     return Padding(
@@ -491,7 +540,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                   alignment: Alignment.centerLeft,
                   child: Text(
                     translate("Your Desktop"),
-                    style: const TextStyle(fontSize: 19, color: _sidebarText),
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _sidebarText),
                   ),
                 ),
             ],

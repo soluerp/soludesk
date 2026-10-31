@@ -181,10 +181,10 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   );
 
   static final dark = ColorThemeExtension(
-    border: Color(0xFF555555),
+    border: Color(0xFF2F4E8F),
     border2: Color(0xFFE5E5E5),
     border3: Colors.white24,
-    highlight: Color(0xFF3F3F3F),
+    highlight: Color(0xFF16306B),
     drag_indicator: Colors.grey,
     shadow: Colors.grey,
     errorBannerBg: Color(0xFF470F2D),
@@ -473,9 +473,9 @@ class MyTheme {
   static ThemeData darkTheme = ThemeData(
     useMaterial3: false,
     brightness: Brightness.dark,
-    hoverColor: Color.fromARGB(255, 45, 46, 53),
-    scaffoldBackgroundColor: Color(0xFF18191E),
-    dialogBackgroundColor: Color(0xFF18191E),
+    hoverColor: Color(0xFF16306B),
+    scaffoldBackgroundColor: Color(0xFF0B1A3F),
+    dialogBackgroundColor: Color(0xFF0F2454),
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
@@ -485,14 +485,14 @@ class MyTheme {
         borderRadius: BorderRadius.circular(18.0),
         side: BorderSide(
           width: 1,
-          color: Color(0xFF24252B),
+          color: Color(0xFF2F4E8F),
         ),
       ),
     ),
     scrollbarTheme: scrollbarThemeDark,
     inputDecorationTheme: (isDesktop || isWebDesktop)
         ? InputDecorationTheme(
-            fillColor: Color(0xFF24252B),
+            fillColor: Color(0xFF132B60),
             filled: true,
             isDense: true,
             border: OutlineInputBorder(
@@ -511,7 +511,7 @@ class MyTheme {
         color: accent80,
       ),
     ),
-    cardColor: Color(0xFF24252B),
+    cardColor: Color(0xFF132B60),
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarThemeData(
       labelColor: Colors.white70,
@@ -534,8 +534,8 @@ class MyTheme {
         : mobileTextButtonTheme,
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: MyTheme.accent,
-        foregroundColor: Colors.white,
+        backgroundColor: Color(0xFF21BFB9),
+        foregroundColor: Color(0xFF062B2A),
         disabledForegroundColor: Colors.white70,
         disabledBackgroundColor: Colors.white10,
         shape: RoundedRectangleBorder(
@@ -545,8 +545,8 @@ class MyTheme {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        backgroundColor: Color(0xFF24252B),
-        side: BorderSide(color: Colors.white12, width: 0.5),
+        backgroundColor: Color(0xFF132B60),
+        side: BorderSide(color: Color(0xFF2F4E8F), width: 0.5),
         disabledForegroundColor: Colors.white70,
         foregroundColor: Colors.white70,
         shape: RoundedRectangleBorder(
@@ -560,11 +560,11 @@ class MyTheme {
     listTileTheme: listTileTheme,
     menuBarTheme: MenuBarThemeData(
         style: MenuStyle(
-            backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),
+            backgroundColor: MaterialStatePropertyAll(Color(0xFF071331)))),
     colorScheme: ColorScheme.dark(
       primary: Color(0xFF1269D3),
       secondary: Color(0xFF21BFB9),
-      background: Color(0xFF24252B),
+      background: Color(0xFF132B60),
     ),
     popupMenuTheme: PopupMenuThemeData(
         shape: RoundedRectangleBorder(
@@ -579,7 +579,10 @@ class MyTheme {
   );
 
   static ThemeMode getThemeModePreference() {
-    return themeModeFromString(bind.mainGetLocalOption(key: kCommConfKeyTheme));
+    final value = bind.mainGetLocalOption(key: kCommConfKeyTheme);
+    // SOLUDESK: sem escolha salva, abre no tema escuro (painel navy).
+    if (value.isEmpty) return ThemeMode.dark;
+    return themeModeFromString(value);
   }
 
   static Future<void> changeDarkMode(ThemeMode mode) async {
