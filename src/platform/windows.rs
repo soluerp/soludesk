@@ -134,6 +134,10 @@ const MSI_EXIT_SUCCESS_REBOOT_INITIATED: u32 = 1641;
 const MSI_EXIT_SUCCESS_REBOOT_REQUIRED: u32 = 3010;
 const HKLM_PREFIX: &str = "HKEY_LOCAL_MACHINE\\";
 
+/// Versão do SOLUDESK mostrada em "Aplicativos instalados". A versão do protocolo
+/// (crate::VERSION, herdada do RustDesk) continua a mesma para manter a compatibilidade.
+pub const SOLUDESK_VERSION: &str = "1.0.0";
+
 pub fn get_focused_display(displays: Vec<DisplayInfo>) -> Option<usize> {
     unsafe {
         let hwnd = GetForegroundWindow();
@@ -1676,7 +1680,7 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     let mut version_major = "0";
     let mut version_minor = "0";
     let mut version_build = "0";
-    let versions: Vec<&str> = crate::VERSION.split(".").collect();
+    let versions: Vec<&str> = SOLUDESK_VERSION.split(".").collect();
     if versions.len() > 0 {
         version_major = versions[0];
     }
@@ -1849,7 +1853,7 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
     ",
         display_icon = shortcut_icon_location.as_deref().unwrap_or(exe.as_str()),
         nested_exe = escape_nested_cmd_ampersands(&exe),
-        version = crate::VERSION.replace("-", "."),
+        version = SOLUDESK_VERSION.to_owned(),
         build_date = crate::BUILD_DATE,
         sleep = if debug { "timeout 300" } else { "" },
         dels = if debug { "" } else { &dels },
@@ -3508,7 +3512,7 @@ pub fn update_me(debug: bool) -> ResultType<()> {
     let mut version_major = "0";
     let mut version_minor = "0";
     let mut version_build = "0";
-    let versions: Vec<&str> = crate::VERSION.split(".").collect();
+    let versions: Vec<&str> = SOLUDESK_VERSION.split(".").collect();
     if versions.len() > 0 {
         version_major = versions[0];
     }
@@ -3518,7 +3522,7 @@ pub fn update_me(debug: bool) -> ResultType<()> {
     if versions.len() > 2 {
         version_build = versions[2];
     }
-    let version = crate::VERSION.replace("-", ".");
+    let version = SOLUDESK_VERSION.to_owned();
     let size = get_directory_size_kb(&path);
     let build_date = crate::BUILD_DATE;
     // Use the icon in the previous installation directory if possible.
