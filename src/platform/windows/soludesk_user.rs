@@ -255,3 +255,43 @@ pub fn user_uninstall() -> ResultType<()> {
     log::info!("Instalação por usuário do SOLUDESK removida");
     Ok(())
 }
+
+/// Argumento usado pelo processo novo para esperar o antigo fechar.
+pub const WAIT_PID_ARG: &str = "--soludesk-wait-pid=";
+
+/// O processo atual roda como administrador (token elevado). Calculado uma vez.
+pub fn is_current_process_elevated() -> bool {
+    static ELEVATED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ELEVATED.get_or_init(|| super::is_elevated(None).unwrap_or(false))
+}
+
+/// Reabre o SOLUDESK como administrador. Quem decide é a pessoa no computador,
+/// na confirmação normal do Windows (UAC); nada é feito sem esse clique.
+/// `Ok(true)`: o Windows abriu o processo novo, que espera este fechar.
+/// `Ok(false)`: a pessoa cancelou a confirmação.
+pub fn restart_elevated() -> ResultType<bool> {
+    let exe = std::env::current_exe()?.to_string_lossy().to_string();
+    let arg = format!("{}{}", WAIT_PID_ARG, std::process::id());
+    super::run_uac(&exe, &arg)
+}
+
+/// Espera o processo `pid` (a janela anterior do SOLUDESK) fechar, no máximo 15 s.
+pub fn wait_for_previous_instance(pid: u32) {
+    use winapi::um::{
+        handleapi::CloseHandle, processthreadsapi::OpenProcess, synchapi::WaitForSingleObject,
+        winnt::SYNCHRONIZE,
+    };
+    if pid == 0 || pid == std::process::id() {
+        return;
+    }
+    unsafe {
+        let handle = OpenProcess(SYNCHRONIZE, 0, pid);
+        if handle.is_null() {
+            return; // já fechou
+        }
+        WaitForSingleObject(handle, 15_000);
+        CloseHandle(handle);
+    }
+    // Dá tempo para o Windows liberar a janela e o canal de IPC do processo antigo.
+    std::thread::sleep(std::time::Duration::from_millis(300));
+}

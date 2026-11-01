@@ -87,6 +87,18 @@ pub fn core_main() -> Option<CoreMainAction> {
                 _is_quick_support = true;
             } else if arg == "--no-server" {
                 no_server = true;
+            } else if arg.starts_with("--soludesk-wait-pid=") {
+                // Reaberto como administrador pelo botão do SOLUDESK (com UAC):
+                // espera a janela anterior fechar e segue como abertura normal.
+                #[cfg(windows)]
+                {
+                    if let Some(pid) = arg
+                        .strip_prefix(crate::platform::windows::WAIT_PID_ARG)
+                        .and_then(|v| v.parse::<u32>().ok())
+                    {
+                        crate::platform::windows::wait_for_previous_instance(pid);
+                    }
+                }
             } else {
                 args.push(arg);
             }

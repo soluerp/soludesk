@@ -5622,10 +5622,17 @@ impl Connection {
             return;
         }
         let running = portable_client::running();
-        let show_elevation = !running;
+        // SOLUDESK: a elevação remota pela janela de conexão está desativada; o
+        // botão de lá não faria nada. Quem está no computador usa "Permitir acesso
+        // como administrador" na tela principal (confirmação UAC do Windows).
         self.send_to_cm(ipc::Data::DataPortableService(
-            ipc::DataPortableService::CmShowElevation(show_elevation),
+            ipc::DataPortableService::CmShowElevation(false),
         ));
+        if crate::platform::windows::is_current_process_elevated() {
+            // Já roda como administrador: o técnico consegue usar janelas elevadas,
+            // então não há aviso de "janela elevada" a mandar.
+            return;
+        }
         if self.authorized {
             let p = &mut self.portable;
             if Some(running) != p.last_running {

@@ -2698,6 +2698,12 @@ pub fn main_get_printer_names() -> SyncReturn<String> {
 }
 
 pub fn main_get_common(key: String) -> String {
+    if key == "soludesk-is-elevated" {
+        #[cfg(target_os = "windows")]
+        return crate::platform::windows::is_current_process_elevated().to_string();
+        #[cfg(not(target_os = "windows"))]
+        return false.to_string();
+    }
     if key == "soludesk-user-installed" {
         #[cfg(target_os = "windows")]
         return crate::platform::windows::is_running_from_user_install().to_string();
@@ -2813,6 +2819,25 @@ fn verified_update_artifact_for_release_page_url(
 }
 
 pub fn main_set_common(_key: String, _value: String) {
+    #[cfg(target_os = "windows")]
+    if _key == "soludesk-restart-elevated" {
+        // A confirmação do UAC bloqueia até a pessoa responder; não trava a interface.
+        std::thread::spawn(|| match crate::platform::windows::restart_elevated() {
+            Ok(true) => {
+                log::info!("SOLUDESK reaberto como administrador (UAC aceito)");
+                std::process::exit(0);
+            }
+            Ok(false) => log::info!("Abertura como administrador cancelada no UAC"),
+            Err(e) => {
+                log::error!("Falha ao reabrir como administrador: {}", e);
+                crate::platform::message_box(&format!(
+                    "Não foi possível abrir o SOLUDESK como administrador.\n\n{}",
+                    e
+                ));
+            }
+        });
+        return;
+    }
     #[cfg(target_os = "windows")]
     if _key == "install-printer" && crate::platform::is_win_10_or_greater() {
         std::thread::spawn(move || {

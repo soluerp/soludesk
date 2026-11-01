@@ -156,6 +156,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       if (!isOutgoingOnly) buildIDBoard(context),
       if (!isOutgoingOnly) buildPasswordBoard(context),
       if (!isOutgoingOnly && !isIncomingOnly) buildStatusPill(),
+      if (isWindows && !isOutgoingOnly) buildAdminAccess(),
       FutureBuilder<Widget>(
         future: Future.value(
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
@@ -522,6 +523,108 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         );
       }),
     );
+  }
+
+  /// Botão para quem está no computador permitir que o técnico use programas
+  /// que pedem administrador. O Windows mostra a confirmação (UAC); o SOLUDESK
+  /// nunca eleva sozinho.
+  Widget buildAdminAccess() {
+    final elevated =
+        bind.mainGetCommonSync(key: 'soludesk-is-elevated') == 'true';
+    if (elevated) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Tooltip(
+          message:
+              'O SOLUDESK está aberto como administrador. O técnico pode usar programas que exigem administrador. Para voltar ao modo normal, feche e abra o SOLUDESK de novo.',
+          child: Container(
+            margin: const EdgeInsets.only(left: 18, top: 0, bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _sidebarSurface,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.admin_panel_settings_outlined,
+                    size: 14, color: _brandAqua),
+                SizedBox(width: 6),
+                Text('Modo administrador',
+                    style: TextStyle(fontSize: 12, color: _brandAqua)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(left: 18, right: 14, bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: _confirmRestartElevated,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: _statusBorder),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: const [
+                Icon(Icons.admin_panel_settings_outlined,
+                    size: 18, color: _brandAqua),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Permitir acesso como administrador',
+                    style: TextStyle(fontSize: 12, color: _sidebarText),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmRestartElevated() {
+    final hasSession = gFFI.serverModel.clients.isNotEmpty;
+    gFFI.dialogManager.show((setState, close, context) {
+      submit() {
+        close();
+        bind.mainSetCommon(key: 'soludesk-restart-elevated', value: '');
+      }
+
+      return CustomAlertDialog(
+        title: const Text('Permitir acesso como administrador'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+                'O SOLUDESK vai reabrir como administrador. Assim o técnico consegue usar programas e configurações que pedem administrador.'),
+            const SizedBox(height: 8),
+            const Text(
+                'O Windows vai pedir a sua confirmação. Só aceite se você confia no técnico.'),
+            const SizedBox(height: 8),
+            Text(
+                hasSession
+                    ? 'A conexão atual será encerrada e a senha temporária pode mudar. Passe a nova senha ao técnico para ele conectar de novo.'
+                    : 'Faça isso antes de passar a senha ao técnico: a senha temporária pode mudar ao reabrir.',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        actions: [
+          dialogButton('Cancel', onPressed: close, isOutline: true),
+          dialogButton('Continuar', onPressed: submit),
+        ],
+        onSubmit: submit,
+        onCancel: close,
+      );
+    });
   }
 
   buildTip(BuildContext context) {
