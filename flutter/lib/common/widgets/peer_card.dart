@@ -289,11 +289,14 @@ class _PeerCardState extends State<_PeerCard>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final child = Card(
       color: Colors.transparent,
-      elevation: isRecent ? 12 : 0,
+      elevation: isRecent && !isDark ? 12 : 0,
       shadowColor: isDark ? const Color(0x883B82F6) : const Color(0x66182B44),
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(_cardRadius),
+        side: isDark
+            ? const BorderSide(color: Color(0xFF30343E))
+            : BorderSide.none,
       ),
       margin: EdgeInsets.zero,
       // to-do: memory leak here, more investigation needed.
@@ -310,7 +313,9 @@ class _PeerCardState extends State<_PeerCard>
               children: [
                 Expanded(
                   child: Container(
-                    color: str2color('${peer.id}${peer.platform}', 0x7f),
+                    color: isDark
+                        ? const Color(0xFF23262E)
+                        : str2color('${peer.id}${peer.platform}', 0x7f),
                     child: Row(
                       children: [
                         Expanded(
@@ -319,8 +324,11 @@ class _PeerCardState extends State<_PeerCard>
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(6),
-                                child:
-                                    getPlatformImage(peer.platform, size: 60),
+                                child: Opacity(
+                                  opacity: isDark ? 0.55 : 1,
+                                  child: getPlatformImage(peer.platform,
+                                      size: isDark ? 44 : 60),
+                                ),
                               ),
                               Row(
                                 children: [
@@ -1478,7 +1486,9 @@ Widget getOnline(double rightPadding, bool online) {
       child: Padding(
           padding: EdgeInsets.fromLTRB(0, 4, rightPadding, 4),
           child: CircleAvatar(
-              radius: 3, backgroundColor: online ? Colors.green : kColorWarn)));
+              radius: 3,
+              backgroundColor:
+                  online ? const Color(0xFF2FD0EE) : const Color(0xFF6B7080))));
 }
 
 Widget build_more(BuildContext context, {bool invert = false}) {

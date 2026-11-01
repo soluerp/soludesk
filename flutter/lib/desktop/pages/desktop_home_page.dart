@@ -33,14 +33,14 @@ class DesktopHomePage extends StatefulWidget {
 }
 
 const borderColor = Color(0xFF2F65BA);
-const Color _sidebarBackground = Color(0xFF0F2454);
+// Cores do logo SOLUDESK: navy, azul e ciano.
+const Color _sidebarBackground = Color(0xFF0D1F4C);
 const Color _sidebarSurface = Color(0xFF16306B);
-const Color _sidebarText = Color(0xFFF4F7FF);
-const Color _sidebarMutedText = Color(0xFF9FB2DA);
+const Color _sidebarText = Color(0xFFF2F5FB);
+const Color _sidebarMutedText = Color(0xFF8FA3CF);
 const Color _sidebarDivider = Color(0xFF263D70);
-const Color _brandAqua = Color(0xFF21BFB9);
-const Color _statusReadyBg = Color(0xFF0B3B4A);
-const Color _statusReadyText = Color(0xFF5FE0D9);
+const Color _brandAqua = Color(0xFF2FD0EE);
+const Color _statusBorder = Color(0xFF1E4E8C);
 const String _monoFont = 'Consolas';
 
 class _DesktopHomePageState extends State<DesktopHomePage>
@@ -499,7 +499,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           margin: const EdgeInsets.only(left: 18, top: 4, bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: ready ? _statusReadyBg : _sidebarSurface,
+            border: Border.all(color: _statusBorder),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -515,7 +515,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 label,
                 style: TextStyle(
                     fontSize: 12,
-                    color: ready ? _statusReadyText : _sidebarMutedText),
+                    color: ready ? _brandAqua : _sidebarMutedText),
               ),
             ],
           ),

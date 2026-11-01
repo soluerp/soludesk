@@ -155,7 +155,7 @@ class _PeerTabPageState extends State<PeerTabPage>
               borderRadius: BorderRadius.circular(6));
           final decoBorder = BoxDecoration(
               border: Border(
-            bottom: BorderSide(width: 2, color: color!),
+            bottom: BorderSide(width: 2, color: const Color(0xFF2FD0EE)),
           ));
           counter += 1;
           return ReorderableDragStartListener(
@@ -170,7 +170,12 @@ class _PeerTabPageState extends State<PeerTabPage>
                         decoration: (hover.value
                             ? (selected ? decoBorder : deco)
                             : (selected ? decoBorder : null)),
-                        child: Icon(model.tabIcon(t), color: color)
+                        child: ((isDesktop || isWebDesktop)
+                                ? Text(model.tabTooltip(t),
+                                        style: TextStyle(
+                                            color: color, fontSize: 13))
+                                    .paddingSymmetric(vertical: 4)
+                                : Icon(model.tabIcon(t), color: color))
                             .paddingSymmetric(horizontal: 4),
                       ).paddingSymmetric(horizontal: 4),
                       onTap: isOptionFixed(kOptionPeerTabIndex)
