@@ -179,14 +179,6 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                       ),
                     ).workaroundFreezeLinuxMint().marginOnly(right: 10),
                   ),
-                  Obx(
-                    () => OutlinedButton.icon(
-                      icon: Icon(Icons.folder_outlined, size: 16),
-                      onPressed: btnEnabled.value ? selectInstallPath : null,
-                      style: buttonStyle,
-                      label: Text(translate('Change Path')),
-                    ),
-                  )
                 ],
               ).marginSymmetric(vertical: 2 * em),
               Option(startmenu, label: 'Create start menu shortcuts')
@@ -195,9 +187,11 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                   .marginOnly(bottom: 7),
               Option(startup,
                       label:
-                          'Manter o SOLUDESK ativo com o Windows (serviço opcional)')
+                          'Abrir o SOLUDESK ao entrar no Windows (para acesso com senha permanente)')
                   .marginOnly(bottom: 7),
-              Option(printer, label: 'Install {$appName} Printer'),
+              Text('Instalação só para este usuário: não pede administrador e não instala serviço.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey))
+                  .marginOnly(bottom: 7),
               Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -219,9 +213,10 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                           InkWell(
                             hoverColor: Colors.transparent,
                             onTap: () => launchUrlString(
-                                'https://rustdesk.com/privacy.html'),
+                                'https://github.com/soluerp/soludesk#privacy-policy'),
                             child: Tooltip(
-                              message: 'https://rustdesk.com/privacy.html',
+                              message:
+                                  'https://github.com/soluerp/soludesk#privacy-policy',
                               child: Row(children: [
                                 Icon(Icons.launch_outlined, size: 16)
                                     .marginOnly(right: 5),
@@ -292,7 +287,6 @@ class _InstallPageBodyState extends State<_InstallPageBody>
       if (startmenu.value) args += ' startmenu';
       if (desktopicon.value) args += ' desktopicon';
       if (startup.value) args += ' startup';
-      if (printer.value) args += ' printer';
       bind.installInstallMe(options: args, path: controller.text);
     }
 

@@ -602,7 +602,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
 
     if (isWindows && !bind.isDisableInstallation()) {
-      if (!bind.mainIsInstalled()) {
+      if (!bind.mainIsInstalled() &&
+          bind.mainGetCommonSync(key: 'soludesk-user-installed') != 'true') {
         return buildInstallCard(
             "", bind.isOutgoingOnly() ? "" : "install_tip", "Install",
             () async {

@@ -2698,6 +2698,12 @@ pub fn main_get_printer_names() -> SyncReturn<String> {
 }
 
 pub fn main_get_common(key: String) -> String {
+    if key == "soludesk-user-installed" {
+        #[cfg(target_os = "windows")]
+        return crate::platform::windows::is_running_from_user_install().to_string();
+        #[cfg(not(target_os = "windows"))]
+        return false.to_string();
+    }
     if key == "is-printer-installed" {
         #[cfg(target_os = "windows")]
         {

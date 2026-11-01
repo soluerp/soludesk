@@ -105,6 +105,32 @@ pub fn goto_install() {
 
 #[inline]
 pub fn install_me(_options: String, _path: String, _silent: bool, _debug: bool) {
+    // SOLUDESK: o botão Instalar faz a instalação só para o usuário atual, sem
+    // administrador, serviço, firewall ou alteração de políticas do Windows.
+    #[cfg(windows)]
+    std::thread::spawn(move || {
+        match crate::platform::windows::user_install(&_options) {
+            Ok(exe) => {
+                if !_silent {
+                    std::process::Command::new(&exe).spawn().ok();
+                }
+            }
+            Err(err) => {
+                log::error!("Installation failed: {err:#}");
+                if !_silent {
+                    crate::platform::windows::message_box(&format!(
+                        "Não foi possível instalar o SOLUDESK:\n{err:#}!"
+                    ));
+                }
+            }
+        }
+        std::process::exit(0);
+    });
+}
+
+#[inline]
+#[allow(dead_code)]
+pub fn install_me_full(_options: String, _path: String, _silent: bool, _debug: bool) {
     #[cfg(windows)]
     std::thread::spawn(move || {
         if let Err(err) = crate::platform::windows::install_me(&_options, _path, _silent, _debug) {
@@ -125,6 +151,21 @@ pub fn install_me(_options: String, _path: String, _silent: bool, _debug: bool) 
 
 #[inline]
 pub fn uninstall_me() {
+    #[cfg(windows)]
+    if crate::platform::windows::is_running_from_user_install()
+        || (crate::platform::windows::is_user_installed() && !crate::platform::is_installed())
+    {
+        std::thread::spawn(move || {
+            if let Err(err) = crate::platform::windows::user_uninstall() {
+                log::error!("Uninstallation failed: {err:#}");
+                crate::platform::windows::message_box(&format!(
+                    "Não foi possível desinstalar o SOLUDESK:\n{err:#}!"
+                ));
+            }
+            std::process::exit(0);
+        });
+        return;
+    }
     #[cfg(windows)]
     std::thread::spawn(move || {
         if let Err(err) = crate::platform::windows::uninstall_me(true) {
@@ -496,7 +537,9 @@ pub fn set_option(key: String, value: String) {
 #[inline]
 pub fn install_path() -> String {
     #[cfg(windows)]
-    return crate::platform::windows::get_install_info().1;
+    return crate::platform::windows::user_install_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
     #[cfg(not(windows))]
     return "".to_owned();
 }
@@ -504,7 +547,7 @@ pub fn install_path() -> String {
 #[inline]
 pub fn install_options() -> String {
     #[cfg(windows)]
-    return crate::platform::windows::get_install_options();
+    return crate::platform::windows::user_install_options();
     #[cfg(not(windows))]
     return "{}".to_owned();
 }
