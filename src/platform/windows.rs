@@ -142,7 +142,7 @@ const HKLM_PREFIX: &str = "HKEY_LOCAL_MACHINE\\";
 
 /// Versão do SOLUDESK mostrada em "Aplicativos instalados". A versão do protocolo
 /// (crate::VERSION, herdada do RustDesk) continua a mesma para manter a compatibilidade.
-pub const SOLUDESK_VERSION: &str = "1.0.5";
+pub const SOLUDESK_VERSION: &str = "1.0.6";
 
 pub fn get_focused_display(displays: Vec<DisplayInfo>) -> Option<usize> {
     unsafe {

@@ -638,6 +638,13 @@ pub fn is_installed_lower_version() -> bool {
     return false;
     #[cfg(windows)]
     {
+        // SOLUDESK: a instalação só para o usuário roda o próprio exe instalado e
+        // não tem o registro em HKLM; sem instalação completa, não há o que atualizar.
+        if crate::platform::windows::is_running_from_user_install()
+            || !crate::platform::is_installed()
+        {
+            return false;
+        }
         let b = crate::platform::windows::get_reg("BuildDate");
         return crate::BUILD_DATE.cmp(&b).is_gt();
     }
