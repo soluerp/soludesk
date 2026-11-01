@@ -62,7 +62,21 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Instalar dependências nativas (vcpkg na revisão fixada)
+      - name: Preparar cache do vcpkg
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\vcpkg-bincache" | Out-Null
+          "VCPKG_DEFAULT_BINARY_CACHE=$env:RUNNER_TEMP\vcpkg-bincache" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - uses: actions/cache/restore@v4
+        id: vcpkg-cache
+        with:
+          path: ${{ runner.temp }}\vcpkg-bincache
+          key: vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/**') }}
+
+      # Modo manifesto, igual ao build local: usa o vcpkg.json do repositório
+      # e os ports/triplets próprios de res/vcpkg (libvpx, ffmpeg etc.).
+      - name: Instalar dependências nativas (vcpkg.json do repositório)
         shell: pwsh
         run: |
           git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
@@ -71,10 +85,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & "$env:RUNNER_TEMP\vcpkg\vcpkg.exe" install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
+          & "$env:RUNNER_TEMP\vcpkg\vcpkg.exe" install --triplet x64-windows-static --x-install-root="$env:RUNNER_TEMP\vcpkg\installed"
           if ($LASTEXITCODE -ne 0) { throw 'Falha ao instalar dependências do vcpkg.' }
           "VCPKG_ROOT=$env:RUNNER_TEMP\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "VCPKG_INSTALLED_ROOT=$env:RUNNER_TEMP\vcpkg\installed" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      # Salva o cache já aqui: se a compilação falhar depois, a próxima tentativa
+      # não precisa recompilar o ffmpeg e as outras bibliotecas.
+      - uses: actions/cache/save@v4
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\vcpkg-bincache
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
       - name: Compilar (Release + portátil)
         shell: pwsh
