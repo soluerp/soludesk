@@ -120,6 +120,20 @@ pub fn core_main() -> Option<CoreMainAction> {
             hbb_common::allow_err!(crate::platform::check_autostart_config());
             hbb_common::allow_err!(crate::run_me(vec!["--tray"]));
         }
+        // SOLUDESK sem serviço (portátil ou instalado só para o usuário): ícone na
+        // bandeja ligado a esta janela. Fechar a janela só a esconde; "Sair" no
+        // ícone fecha o SOLUDESK de vez.
+        #[cfg(target_os = "windows")]
+        if !should_check_start_tray {
+            hbb_common::allow_err!(crate::run_me(vec![
+                "--tray".to_owned(),
+                format!(
+                    "{}{}",
+                    crate::platform::windows::TRAY_OWNER_ARG,
+                    std::process::id()
+                ),
+            ]));
+        }
     }
     #[cfg(not(debug_assertions))]
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -364,6 +378,15 @@ pub fn core_main() -> Option<CoreMainAction> {
                 return None;
             }
         } else if args[0] == "--tray" {
+            #[cfg(windows)]
+            if let Some(owner) = args
+                .get(1)
+                .and_then(|a| a.strip_prefix(crate::platform::windows::TRAY_OWNER_ARG))
+                .and_then(|v| v.parse::<u32>().ok())
+            {
+                crate::tray::start_tray_for_owner(owner);
+                return None;
+            }
             if !crate::check_process("--tray", true) {
                 crate::tray::start_tray();
             }

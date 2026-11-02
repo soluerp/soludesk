@@ -295,3 +295,59 @@ pub fn wait_for_previous_instance(pid: u32) {
     // Dá tempo para o Windows liberar a janela e o canal de IPC do processo antigo.
     std::thread::sleep(std::time::Duration::from_millis(300));
 }
+
+/// Argumento do ícone da bandeja ligado a uma janela do SOLUDESK sem serviço.
+pub const TRAY_OWNER_ARG: &str = "--soludesk-owner=";
+
+/// O processo `pid` ainda está rodando.
+pub fn is_process_alive(pid: u32) -> bool {
+    use winapi::um::{
+        handleapi::CloseHandle, processthreadsapi::OpenProcess, synchapi::WaitForSingleObject,
+        winnt::SYNCHRONIZE,
+    };
+    use winapi::shared::winerror::WAIT_TIMEOUT;
+    if pid == 0 {
+        return false;
+    }
+    unsafe {
+        let handle = OpenProcess(SYNCHRONIZE, 0, pid);
+        if handle.is_null() {
+            return false;
+        }
+        let alive = WaitForSingleObject(handle, 0) == WAIT_TIMEOUT;
+        CloseHandle(handle);
+        alive
+    }
+}
+
+/// Fecha o SOLUDESK `pid` (usado por "Sair" na bandeja): pede para fechar pelo
+/// canal interno e, se não fechar em 3 s, encerra o processo.
+pub fn quit_owner(pid: u32) {
+    use hbb_common::tokio;
+    #[tokio::main(flavor = "current_thread")]
+    async fn send_close() {
+        if let Ok(mut conn) = crate::ipc::connect(1000, "").await {
+            conn.send(&crate::ipc::Data::Close).await.ok();
+        }
+    }
+    send_close();
+    for _ in 0..30 {
+        if !is_process_alive(pid) {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    use winapi::um::{
+        handleapi::CloseHandle,
+        processthreadsapi::{OpenProcess, TerminateProcess},
+        winnt::PROCESS_TERMINATE,
+    };
+    unsafe {
+        let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
+        if !handle.is_null() {
+            TerminateProcess(handle, 0);
+            CloseHandle(handle);
+        }
+    }
+    log::info!("SOLUDESK {} encerrado pela bandeja", pid);
+}

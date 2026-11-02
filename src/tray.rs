@@ -5,7 +5,23 @@ use crate::ipc::Data;
 use hbb_common::tokio;
 use hbb_common::{allow_err, log};
 use base::config::keys;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU32, Ordering},
+    Arc, Mutex,
+};
+
+/// SOLUDESK: processo da janela a que este ícone pertence (modo sem serviço).
+/// 0 = ícone do serviço, comportamento original do RustDesk.
+static OWNER_PID: AtomicU32 = AtomicU32::new(0);
+static OWNER_GONE: AtomicBool = AtomicBool::new(false);
+
+/// Ícone da bandeja do SOLUDESK sem serviço: "Abrir" mostra a janela e "Sair"
+/// fecha o SOLUDESK. O ícone some sozinho quando a janela dona fecha.
+#[cfg(windows)]
+pub fn start_tray_for_owner(owner: u32) {
+    OWNER_PID.store(owner, Ordering::SeqCst);
+    start_tray();
+}
 #[cfg(windows)]
 use std::time::Duration;
 
@@ -34,8 +50,33 @@ fn make_tray() -> hbb_common::ResultType<()> {
 
     // Duplicated tray icons kept piling up through the blind spots of
     // `check_process("--tray", ..)`. https://github.com/rustdesk/rustdesk/issues/15689
+    let owner = OWNER_PID.load(Ordering::SeqCst);
     #[cfg(windows)]
-    if !crate::platform::windows::try_lock_tray_single_instance() {
+    if owner != 0 {
+        // Ao reabrir como administrador, o ícone da janela anterior leva até ~1 s
+        // para sair: tenta por alguns segundos antes de desistir.
+        let mut locked = false;
+        for _ in 0..20 {
+            if !crate::platform::windows::is_process_alive(owner) {
+                return Ok(());
+            }
+            if crate::platform::windows::try_lock_tray_single_instance() {
+                locked = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+        if !locked {
+            log::info!("Another tray process is already running in this session, exit");
+            return Ok(());
+        }
+        std::thread::spawn(move || {
+            while crate::platform::windows::is_process_alive(owner) {
+                std::thread::sleep(Duration::from_secs(1));
+            }
+            OWNER_GONE.store(true, Ordering::SeqCst);
+        });
+    } else if !crate::platform::windows::try_lock_tray_single_instance() {
         log::info!("Another tray process is already running in this session, exit");
         return Ok(());
     }
@@ -69,19 +110,29 @@ fn make_tray() -> hbb_common::ResultType<()> {
     ) == "Y";
     // The tray icon is only shown when the service is running, so we don't need to check
     // the `stop-service` option here.
-    let quit_i = if !hide_stop_service {
+    let quit_i = if owner != 0 {
+        Some(MenuItem::new("Sair", true, None))
+    } else if !hide_stop_service {
         Some(MenuItem::new(translate("Stop service".to_owned()), true, None))
     } else {
         None
     };
-    let open_i = MenuItem::new(translate("Open".to_owned()), true, None);
+    let open_i = if owner != 0 {
+        MenuItem::new(format!("Abrir {}", crate::get_app_name()), true, None)
+    } else {
+        MenuItem::new(translate("Open".to_owned()), true, None)
+    };
     if let Some(quit_i) = &quit_i {
         tray_menu.append_items(&[&open_i, quit_i]).ok();
     } else {
         tray_menu.append_items(&[&open_i]).ok();
     }
-    let tooltip = |count: usize| {
-        if count == 0 {
+    let tooltip = move |count: usize| {
+        if owner != 0 && count == 0 {
+            format!("{} - Pronto para receber", crate::get_app_name())
+        } else if owner != 0 {
+            format!("{} - {} sessão(ões) ativa(s)", crate::get_app_name(), count)
+        } else if count == 0 {
             format!(
                 "{} {}",
                 crate::get_app_name(),
@@ -145,6 +196,17 @@ fn make_tray() -> hbb_common::ResultType<()> {
             std::time::Instant::now() + std::time::Duration::from_millis(100),
         );
 
+        if OWNER_GONE.load(Ordering::SeqCst) {
+            // A janela dona fechou (Sair, reabertura como administrador etc.).
+            let _ = _tray_icon
+                .lock()
+                .unwrap()
+                .as_mut()
+                .map(|t| t.set_visible(false));
+            *control_flow = ControlFlow::Exit;
+            return;
+        }
+
         if let tao::event::Event::NewEvents(tao::event::StartCause::Init) = event {
             // for fixing https://github.com/rustdesk/rustdesk/discussions/10210#discussioncomment-14600745
             // so we start tray, but not to show it
@@ -189,7 +251,19 @@ fn make_tray() -> hbb_common::ResultType<()> {
 
         if let Ok(event) = menu_channel.try_recv() {
             if let Some(quit_i) = &quit_i {
-                if event.id == quit_i.id() {
+                if event.id == quit_i.id() && owner != 0 {
+                    #[cfg(windows)]
+                    {
+                        let _ = _tray_icon
+                            .lock()
+                            .unwrap()
+                            .as_mut()
+                            .map(|t| t.set_visible(false));
+                        crate::platform::windows::quit_owner(owner);
+                    }
+                    *control_flow = ControlFlow::Exit;
+                    return;
+                } else if event.id == quit_i.id() {
                     /* failed in windows, seems no permission to check system process
                     if !crate::check_process("--server", false) {
                         *control_flow = ControlFlow::Exit;

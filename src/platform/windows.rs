@@ -107,6 +107,7 @@ pub use soludesk_user::{
     is_current_process_elevated, is_running_from_user_install, is_user_installed,
     restart_elevated, user_install, user_install_dir, user_install_options, user_uninstall,
     wait_for_previous_instance, WAIT_PID_ARG,
+    is_process_alive, quit_owner, TRAY_OWNER_ARG,
 };
 pub(crate) use acl::current_process_user_sid_string;
 pub use acl::{
