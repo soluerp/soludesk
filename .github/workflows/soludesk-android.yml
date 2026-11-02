@@ -132,7 +132,16 @@ jobs:
           ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           cargo install cargo-ndk --version "$CARGO_NDK_VERSION" --locked
-          ./flutter/${{ matrix.job.ndk_script }}
+          set -o pipefail
+          if ! ./flutter/${{ matrix.job.ndk_script }} 2>&1 | tee cargo.log; then
+            # O log do Actions só abre com login; os erros viram anotações (públicas).
+            grep -n -E "^error|error\[|panicked|^warning: build failed|failed to run custom build|undefined symbol|could not find" cargo.log \
+              | head -n 8 | cut -d: -f1 | while read -r n; do
+                msg=$(sed -n "$((n>3?n-3:1)),$((n+25))p" cargo.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+                echo "::error title=cargo ${{ matrix.job.abi }} linha $n::$msg"
+              done
+            exit 1
+          fi
           mkdir -p saida/${{ matrix.job.abi }}
           cp target/${{ matrix.job.target }}/release/liblibrustdesk.so saida/${{ matrix.job.abi }}/librustdesk.so
           cp "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/${{ matrix.job.ndk_lib }}/libc++_shared.so" saida/${{ matrix.job.abi }}/
@@ -207,9 +216,16 @@ jobs:
         working-directory: flutter
         run: |
           ls -R android/app/src/main/jniLibs
-          flutter pub get
-          flutter build apk --release --target-platform android-arm64,android-arm,android-x64
-          flutter build apk --release --target-platform android-arm64,android-arm,android-x64 --split-per-abi
+          set -o pipefail
+          anotar() {
+            grep -n -E "Error:|error:|What went wrong|FAILURE|Exception" "$1" | head -n 8 | cut -d: -f1 | while read -r n; do
+              msg=$(sed -n "$((n>3?n-3:1)),$((n+25))p" "$1" | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+              echo "::error title=flutter linha $n::$msg"
+            done
+          }
+          flutter pub get 2>&1 | tee ../flutter.log || { anotar ../flutter.log; exit 1; }
+          flutter build apk --release --target-platform android-arm64,android-arm,android-x64 2>&1 | tee ../flutter.log || { anotar ../flutter.log; exit 1; }
+          flutter build apk --release --target-platform android-arm64,android-arm,android-x64 --split-per-abi 2>&1 | tee ../flutter.log || { anotar ../flutter.log; exit 1; }
           v="$VERSAO"
           mkdir -p ../saida
           cd build/app/outputs/flutter-apk
