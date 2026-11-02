@@ -198,15 +198,24 @@ jobs:
           echo "VERSAO=$v" >> "$GITHUB_ENV"
 
       - name: Configurar assinatura
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx4g/" flutter/android/gradle.properties
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > flutter/android/app/soludesk-release.jks
+            # Tolera espaços/quebras de linha coladas junto nos segredos.
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d ' \r\n\t' | base64 -d > flutter/android/app/soludesk-release.jks
+            pw=$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n' | sed 's/^Senha do keystore:[[:space:]]*//; s/^[[:space:]]*//; s/[[:space:]]*$//')
+            # Alias fixo: não é sigiloso. No PKCS12 a senha da chave é a do keystore.
+            if ! keytool -list -keystore flutter/android/app/soludesk-release.jks -storepass "$pw" -alias soludesk >/dev/null 2>&1; then
+              echo "::error title=Assinatura::A chave ou a senha dos segredos não abrem o keystore com o alias soludesk. Confira ANDROID_KEYSTORE_BASE64 (conteúdo de keystore.b64) e ANDROID_KEYSTORE_PASSWORD (conteúdo de SO-A-SENHA.txt)."
+              exit 1
+            fi
             {
               echo "storeFile=soludesk-release.jks"
-              echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
-              echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}"
-              echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}"
+              echo "storePassword=$pw"
+              echo "keyAlias=soludesk"
+              echo "keyPassword=$pw"
             } > flutter/android/key.properties
             echo "ASSINATURA=oficial" >> "$GITHUB_ENV"
           else
