@@ -60,7 +60,10 @@ jobs:
       - name: Instalar pacotes do sistema
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake curl git libclang-dev llvm-dev nasm ninja-build pkg-config autoconf automake libtool
+          # Mesma lista do build Android do RustDesk: sem gcc-multilib/libc6-dev o bindgen
+          # (hwcodec, kcp-sys) não acha bits/libc-header-start.h.
+          sudo apt-get install -y clang cmake curl gcc-multilib git g++ g++-multilib libc6-dev \
+            libclang-dev libunwind-dev llvm-dev nasm ninja-build pkg-config autoconf automake libtool
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
