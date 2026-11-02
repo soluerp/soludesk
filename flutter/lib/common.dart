@@ -2856,6 +2856,13 @@ Future<void> onActiveWindowChanged() async {
   print(
       "[MultiWindowHandler] active window changed: ${rustDeskWinManager.getActiveWindows()}");
   if (rustDeskWinManager.getActiveWindows().isEmpty) {
+    // SOLUDESK sem serviço (portátil ou instalado só para o usuário): fechar a
+    // janela só a tira da barra de tarefas e o SOLUDESK continua recebendo
+    // conexões. Volta pelo ícone da bandeja; "Sair" no ícone fecha de vez.
+    if (isWindows && !bind.mainIsInstalled()) {
+      debugPrint("SOLUDESK: janela escondida, continua na bandeja");
+      return;
+    }
     // close all sub windows
     try {
       if (isLinux) {
