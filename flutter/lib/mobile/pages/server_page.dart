@@ -15,6 +15,9 @@ import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import 'home_page.dart';
 
+const bool kSoludeskSemAcessibilidade =
+    bool.fromEnvironment('SOLUDESK_SEM_ACESSIBILIDADE', defaultValue: false);
+
 class ServerPage extends StatefulWidget implements PageShape {
   @override
   final title = translate("Share screen");
@@ -609,11 +612,14 @@ class _PermissionCheckerState extends State<PermissionChecker> {
                         bind.mainGetLocalOption(key: "show-scam-warning") != "N"
                     ? () => showScamWarning(context, serverModel)
                     : serverModel.toggleService),
-          PermissionRow(
-            translate("Input Control"),
-            serverModel.inputOk,
-            serverModel.toggleInput,
-          ),
+          // SOLUDESK: a versão sem Acessibilidade (APK livre do bloqueio do
+          // Play Protect) não tem o serviço de controle do celular.
+          if (!kSoludeskSemAcessibilidade)
+            PermissionRow(
+              translate("Input Control"),
+              serverModel.inputOk,
+              serverModel.toggleInput,
+            ),
           PermissionRow(
             translate("Transfer file"),
             serverModel.fileOk,

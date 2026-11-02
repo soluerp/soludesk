@@ -253,6 +253,13 @@ jobs:
             flutter build appbundle --release --target-platform android-arm64,android-arm,android-x64 --android-skip-build-dependency-validation 2>&1 | tee ../flutter.log || { anotar ../flutter.log; exit 1; }
             cp build/app/outputs/bundle/release/app-release.aab "../saida/SOLUDESK-$v-play-store.aab"
           fi
+          # Versão sem Acessibilidade: instala baixando o APK (WhatsApp/navegador)
+          # sem o bloqueio do Play Protect no Brasil. O PC vê a tela do celular,
+          # mas não toca nele. Fica por último porque altera o manifesto.
+          python3 android/sem_acessibilidade.py remover android/app/src/main/AndroidManifest.xml
+          flutter build apk --release --target-platform android-arm64,android-arm,android-x64 --android-skip-build-dependency-validation --dart-define=SOLUDESK_SEM_ACESSIBILIDADE=true 2>&1 | tee ../flutter.log || { anotar ../flutter.log; exit 1; }
+          python3 android/sem_acessibilidade.py conferir build/app/outputs/flutter-apk/app-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk "../saida/SOLUDESK-$v-android-sem-acessibilidade.apk"
 
       - name: Hashes
         working-directory: saida
