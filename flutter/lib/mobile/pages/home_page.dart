@@ -76,6 +76,9 @@ class HomePageState extends State<HomePage> {
           // backgroundColor: MyTheme.grayBg,
           appBar: AppBar(
             centerTitle: true,
+            // SOLUDESK: cabeçalho navy igual ao painel do Windows.
+            backgroundColor: _soludeskNavy,
+            foregroundColor: _soludeskText,
             title: appTitle(),
             actions: _pages.elementAt(_selectedIndex).appBarActions,
           ),
@@ -150,8 +153,37 @@ class HomePageState extends State<HomePage> {
         ],
       );
     }
-    return Text(bind.mainGetAppNameSync());
+    return _soludeskLogoTitle();
   }
+}
+
+// Cores do logo SOLUDESK (as mesmas do painel do Windows).
+const Color _soludeskNavy = Color(0xFF0D1F4C);
+const Color _soludeskText = Color(0xFFF2F5FB);
+const Color _soludeskAqua = Color(0xFF2FD0EE);
+
+Widget _soludeskLogoTitle() {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Image.asset('assets/icon.png', width: 30, height: 30, fit: BoxFit.contain),
+      const SizedBox(width: 8),
+      const Text.rich(
+        TextSpan(
+          style: TextStyle(
+            fontFamily: 'SoludeskRounded',
+            fontSize: 21,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 0.25,
+          ),
+          children: [
+            TextSpan(text: 'SOLU', style: TextStyle(color: _soludeskText)),
+            TextSpan(text: 'DESK', style: TextStyle(color: _soludeskAqua)),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 class WebHomePage extends StatelessWidget {
