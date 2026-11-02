@@ -2466,6 +2466,14 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 }
 
 pub fn load_custom_client() {
+    // SOLUDESK: o técnico pode alterar as configurações (inclusive a senha
+    // permanente) durante uma sessão aceita. É só o valor padrão: quem está no
+    // computador pode desmarcar "Habilitar modificações de configuração remotas".
+    config::DEFAULT_SETTINGS
+        .write()
+        .unwrap()
+        .entry("allow-remote-config-modification".to_owned())
+        .or_insert_with(|| "Y".to_owned());
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
