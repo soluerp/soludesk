@@ -227,6 +227,8 @@ jobs:
             done
           }
           flutter pub get 2>&1 | tee ../flutter.log || { anotar ../flutter.log; exit 1; }
+          # Plugins antigos (travados pelo build Windows) ainda citam o embedding v1.
+          python3 android/patch_v1_embedding.py .flutter-plugins-dependencies
           flutter build apk --release --target-platform android-arm64,android-arm,android-x64 --android-skip-build-dependency-validation 2>&1 | tee ../flutter.log || { anotar ../flutter.log; exit 1; }
           flutter build apk --release --target-platform android-arm64,android-arm,android-x64 --android-skip-build-dependency-validation --split-per-abi 2>&1 | tee ../flutter.log || { anotar ../flutter.log; exit 1; }
           v="$VERSAO"
