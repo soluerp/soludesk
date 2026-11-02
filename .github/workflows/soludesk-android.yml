@@ -18,6 +18,10 @@ on:
       versao:
         description: 'Versão SOLUDESK (igual ao flutter/pubspec.yaml), ex.: 1.0.8'
         required: true
+  # O workflow_dispatch só aparece quando o arquivo está no branch padrão; o push
+  # neste branch dispara o build sem mexer no branch do Windows.
+  push:
+    branches: [soludesk-android]
 
 permissions:
   contents: read
@@ -66,7 +70,7 @@ jobs:
       - name: Conferir versão pedida
         run: |
           pub=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' flutter/pubspec.yaml)
-          if [ "$pub" != "${{ inputs.versao }}" ]; then
+          if [ -n "${{ inputs.versao }}" ] && [ "$pub" != "${{ inputs.versao }}" ]; then
             echo "Versão pedida ${{ inputs.versao }} não bate com flutter/pubspec.yaml ($pub)"; exit 1
           fi
           for f in src/bridge_generated.rs src/bridge_generated.io.rs; do
@@ -175,6 +179,12 @@ jobs:
           merge-multiple: true
           path: flutter/android/app/src/main/jniLibs/
 
+      - name: Definir versão
+        run: |
+          v="${{ inputs.versao }}"
+          [ -n "$v" ] || v=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' flutter/pubspec.yaml)
+          echo "VERSAO=$v" >> "$GITHUB_ENV"
+
       - name: Configurar assinatura
         run: |
           sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx4g/" flutter/android/gradle.properties
@@ -200,7 +210,7 @@ jobs:
           flutter pub get
           flutter build apk --release --target-platform android-arm64,android-arm,android-x64
           flutter build apk --release --target-platform android-arm64,android-arm,android-x64 --split-per-abi
-          v="${{ inputs.versao }}"
+          v="$VERSAO"
           mkdir -p ../saida
           cd build/app/outputs/flutter-apk
           cp app-release.apk "../../../../../saida/SOLUDESK-$v-android-universal.apk"
@@ -216,6 +226,6 @@ jobs:
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: SOLUDESK-${{ inputs.versao }}-android
+          name: SOLUDESK-${{ env.VERSAO }}-android
           if-no-files-found: error
           path: saida/
