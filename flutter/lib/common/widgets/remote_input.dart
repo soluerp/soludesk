@@ -101,6 +101,12 @@ class _RawTouchGestureDetectorRegionState
   double _mouseScrollIntegral = 0; // mouse scroll speed controller
   double _scale = 1;
 
+  // SOLUDESK: no modo mouse do celular, um dedo parado + outro arrastando na
+  // vertical rola a tela do computador (antes só com três dedos).
+  final Map<int, Offset> _soludeskPointerStart = {};
+  final Map<int, Offset> _soludeskPointerPos = {};
+  bool? _soludeskHoldScroll;
+
   // Workaround tap down event when two fingers are used to scale(mobile)
   TapDownDetails? _lastTapDownDetails;
 
@@ -127,10 +133,43 @@ class _RawTouchGestureDetectorRegionState
 
   @override
   Widget build(BuildContext context) {
-    return RawGestureDetector(
+    final detector = RawGestureDetector(
       child: widget.child,
       gestures: makeGestures(context),
     );
+    if (!isMobile) return detector;
+    // Só observa os dedos (não entra na disputa de gestos).
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (e) {
+        _soludeskPointerStart[e.pointer] = e.position;
+        _soludeskPointerPos[e.pointer] = e.position;
+      },
+      onPointerMove: (e) => _soludeskPointerPos[e.pointer] = e.position,
+      onPointerUp: (e) => _soludeskForgetPointer(e.pointer),
+      onPointerCancel: (e) => _soludeskForgetPointer(e.pointer),
+      child: detector,
+    );
+  }
+
+  void _soludeskForgetPointer(int pointer) {
+    _soludeskPointerStart.remove(pointer);
+    _soludeskPointerPos.remove(pointer);
+  }
+
+  /// null: ainda não dá para saber; true: um dedo parado e o outro na
+  /// vertical (rolar); false: gesto normal de dois dedos (zoom/mover a tela).
+  bool? _soludeskDetectHoldScroll() {
+    if (_soludeskPointerStart.length != 2) return false;
+    final moves = _soludeskPointerStart.keys.map((p) {
+      final start = _soludeskPointerStart[p]!;
+      return (_soludeskPointerPos[p] ?? start) - start;
+    }).toList();
+    moves.sort((a, b) => a.distance.compareTo(b.distance));
+    final held = moves[0];
+    final mover = moves[1];
+    if (mover.distance < 18) return null;
+    return held.distance < 14 && mover.dy.abs() > mover.dx.abs() * 1.5;
   }
 
   bool isNotTouchBasedDevice() {
@@ -457,6 +496,8 @@ class _RawTouchGestureDetectorRegionState
   // scale + pan event
   onTwoFingerScaleStart(ScaleStartDetails d) {
     _lastTapDownDetails = null;
+    _soludeskHoldScroll = null;
+    _mouseScrollIntegral = 0;
     if (isNotTouchBasedDevice()) {
       return;
     }
@@ -478,6 +519,24 @@ class _RawTouchGestureDetectorRegionState
       _lastSpecialHoldDragFocalPoint = d.focalPoint;
       await ffi.cursorModel.updatePan(delta * 2.0, d.focalPoint, handleTouch);
       return;
+    }
+
+    // SOLUDESK: segurar um dedo e arrastar o outro na vertical = rolar.
+    if (isMobile && !handleTouch && !ffi.ffiModel.isPeerAndroid) {
+      _soludeskHoldScroll ??= _soludeskDetectHoldScroll();
+      if (_soludeskHoldScroll == null) return;
+      if (_soludeskHoldScroll == true) {
+        // Com um dedo parado, o ponto focal anda metade do dedo que se move.
+        _mouseScrollIntegral += d.focalPointDelta.dy * 2 / 4;
+        if (_mouseScrollIntegral > 1) {
+          inputModel.scroll(1);
+          _mouseScrollIntegral = 0;
+        } else if (_mouseScrollIntegral < -1) {
+          inputModel.scroll(-1);
+          _mouseScrollIntegral = 0;
+        }
+        return;
+      }
     }
 
     if (canvasLocked) return;
