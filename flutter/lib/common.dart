@@ -2861,6 +2861,9 @@ Future<void> onActiveWindowChanged() async {
     // conexões. Volta pelo ícone da bandeja; "Sair" no ícone fecha de vez.
     if (isWindows && !bind.mainIsInstalled()) {
       debugPrint("SOLUDESK: janela escondida, continua na bandeja");
+      // Nenhuma janela visível: o teclado deste computador não pode ficar preso
+      // a uma sessão escondida.
+      await bind.mainSetCommon(key: 'soludesk-release-grab', value: '');
       return;
     }
     // close all sub windows

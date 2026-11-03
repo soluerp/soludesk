@@ -2474,6 +2474,13 @@ pub fn load_custom_client() {
         .unwrap()
         .entry("allow-remote-config-modification".to_owned())
         .or_insert_with(|| "Y".to_owned());
+    // SOLUDESK: imagem mais nítida por padrão (qualidade "Melhor"). O técnico ainda
+    // pode trocar na barra da sessão; vale para computadores ainda sem escolha salva.
+    config::DEFAULT_DISPLAY_SETTINGS
+        .write()
+        .unwrap()
+        .entry("image_quality".to_owned())
+        .or_insert_with(|| "best".to_owned());
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());

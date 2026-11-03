@@ -148,6 +148,18 @@ pub mod client {
         }
     }
 
+    /// SOLUDESK: solta a captura do teclado local, seja qual for a sessão dona.
+    /// Usado ao fechar/esconder janelas: com o SOLUDESK continuando na bandeja, uma
+    /// janela de sessão escondida não pode deixar o teclado do técnico preso.
+    pub fn release_grab_any() {
+        let owner = GRAB_STATE.lock().unwrap().owner;
+        if let Some(owner) = owner {
+            change_grab_status(GrabState::Wait, "map", owner);
+        }
+        #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+        KEYBOARD_HOOKED.store(false, Ordering::SeqCst);
+    }
+
     pub fn start_grab_loop() {
         let mut lock = IS_GRAB_STARTED.lock().unwrap();
         if *lock {

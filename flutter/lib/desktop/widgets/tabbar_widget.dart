@@ -451,6 +451,9 @@ class _DesktopTabState extends State<DesktopTab>
         }
         controller.clear();
       }
+      // SOLUDESK: a janela da sessão só é escondida (o app continua na bandeja);
+      // solta a captura do teclado local antes de esconder.
+      await bind.mainSetCommon(key: 'soludesk-release-grab', value: '');
       await windowController.hide();
       await rustDeskWinManager
           .call(WindowType.Main, kWindowEventHide, {"id": kWindowId!});

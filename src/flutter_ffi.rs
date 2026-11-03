@@ -676,6 +676,14 @@ pub fn session_enter_or_leave(_session_id: SessionID, _enter: bool) -> SyncRetur
                 window_id,
             );
         }
+    } else if !_enter {
+        // SOLUDESK: a sessão já foi encerrada; mesmo assim solta o teclado se esta
+        // janela ainda era a dona da captura.
+        crate::keyboard::client::change_grab_status(
+            crate::common::GrabState::Wait,
+            "map",
+            _session_id.as_u128(),
+        );
     }
     SyncReturn(())
 }
@@ -2819,6 +2827,11 @@ fn verified_update_artifact_for_release_page_url(
 }
 
 pub fn main_set_common(_key: String, _value: String) {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    if _key == "soludesk-release-grab" {
+        crate::keyboard::client::release_grab_any();
+        return;
+    }
     #[cfg(target_os = "windows")]
     if _key == "soludesk-restart-elevated" {
         // A confirmação do UAC bloqueia até a pessoa responder; não trava a interface.
