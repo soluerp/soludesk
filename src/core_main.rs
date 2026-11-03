@@ -61,6 +61,8 @@ pub fn core_main() -> Option<CoreMainAction> {
     let mut _is_flutter_invoke_new_connection = false;
     let mut no_server = false;
     let mut arg_exe = Default::default();
+    #[cfg(windows)]
+    let mut soludesk_update_from: Option<u32> = None;
     for arg in std::env::args() {
         if i == 0 {
             arg_exe = arg;
@@ -87,6 +89,14 @@ pub fn core_main() -> Option<CoreMainAction> {
                 _is_quick_support = true;
             } else if arg == "--no-server" {
                 no_server = true;
+            } else if arg.starts_with("--soludesk-update-install=") {
+                // Versão nova baixada pelo botão Atualizar: instala por cima.
+                #[cfg(windows)]
+                {
+                    soludesk_update_from = arg
+                        .strip_prefix(crate::platform::windows::UPDATE_INSTALL_ARG)
+                        .and_then(|v| v.parse::<u32>().ok());
+                }
             } else if arg.starts_with("--soludesk-wait-pid=") {
                 // Reaberto como administrador pelo botão do SOLUDESK (com UAC):
                 // espera a janela anterior fechar e segue como abertura normal.
@@ -104,6 +114,12 @@ pub fn core_main() -> Option<CoreMainAction> {
             }
         }
         i += 1;
+    }
+    #[cfg(windows)]
+    if let Some(old_pid) = soludesk_update_from {
+        hbb_common::init_log(false, "update");
+        crate::platform::windows::finish_update_install(old_pid);
+        return None;
     }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {

@@ -2706,6 +2706,12 @@ pub fn main_get_printer_names() -> SyncReturn<String> {
 }
 
 pub fn main_get_common(key: String) -> String {
+    if key == "soludesk-update-state" {
+        #[cfg(target_os = "windows")]
+        return crate::platform::windows::update_state_json();
+        #[cfg(not(target_os = "windows"))]
+        return "{}".to_owned();
+    }
     if key == "soludesk-is-elevated" {
         #[cfg(target_os = "windows")]
         return crate::platform::windows::is_current_process_elevated().to_string();
@@ -2827,6 +2833,17 @@ fn verified_update_artifact_for_release_page_url(
 }
 
 pub fn main_set_common(_key: String, _value: String) {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    #[cfg(target_os = "windows")]
+    if _key == "soludesk-update-check" {
+        crate::platform::windows::start_update_checker();
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    if _key == "soludesk-update-start" {
+        crate::platform::windows::start_update_download();
+        return;
+    }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     if _key == "soludesk-release-grab" {
         crate::keyboard::client::release_grab_any();

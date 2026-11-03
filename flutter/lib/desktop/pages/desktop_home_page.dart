@@ -58,6 +58,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   var watchIsCanRecordAudio = false;
   Timer? _updateTimer;
   bool isCardClosed = false;
+  // SOLUDESK: estado da atualização pelo GitHub (JSON vindo do Rust).
+  String _soludeskUpdate = '';
 
   final RxBool _editHover = false.obs;
   final RxBool _block = false.obs;
@@ -673,7 +675,73 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  /// Card "Nova versão disponível" do SOLUDESK (null quando não há).
+  Widget? _buildSoludeskUpdateCard() {
+    Map<String, dynamic> s;
+    try {
+      s = jsonDecode(_soludeskUpdate) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+    final version = (s['version'] ?? '') as String;
+    if (version.isEmpty) return null;
+    final status = (s['status'] ?? '') as String;
+    final installed = s['installed'] == true;
+    if (status == 'downloading') {
+      return buildInstallCard(
+          'Atualização',
+          'Baixando o SOLUDESK $version... O app vai fechar e abrir sozinho já atualizado.',
+          '',
+          () {});
+    }
+    final text = status == 'error'
+        ? 'Não foi possível atualizar para a versão $version: ${s['error'] ?? ''}'
+        : 'Nova versão do SOLUDESK disponível: $version.';
+    return buildInstallCard(
+        'Atualização', text, status == 'error' ? 'Tentar de novo' : 'Atualizar',
+        () => _confirmSoludeskUpdate(version, installed));
+  }
+
+  void _confirmSoludeskUpdate(String version, bool installed) {
+    final hasSession = gFFI.serverModel.clients.isNotEmpty;
+    gFFI.dialogManager.show((setState, close, context) {
+      submit() {
+        close();
+        bind.mainSetCommon(key: 'soludesk-update-start', value: '');
+      }
+
+      return CustomAlertDialog(
+        title: Text('Atualizar para o SOLUDESK $version'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(installed
+                ? 'O SOLUDESK vai baixar a nova versão, fechar e abrir de novo já atualizado. ID, senha e configurações continuam os mesmos.'
+                : 'O novo SOLUDESK-$version.exe será salvo na pasta Downloads e aberto no lugar deste. ID, senha e configurações continuam os mesmos.'),
+            if (hasSession) ...[
+              const SizedBox(height: 8),
+              const Text(
+                  'A conexão atual será encerrada. O técnico precisará conectar de novo.',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ],
+        ),
+        actions: [
+          dialogButton('Cancel', onPressed: close, isOutline: true),
+          dialogButton('Atualizar', onPressed: submit),
+        ],
+        onSubmit: submit,
+        onCancel: close,
+      );
+    });
+  }
+
   Widget buildHelpCards(String updateUrl) {
+    if (isWindows) {
+      final soludeskCard = _buildSoludeskUpdateCard();
+      if (soludeskCard != null) return soludeskCard;
+    }
     if (!bind.isCustomClient() &&
         updateUrl.isNotEmpty &&
         !isCardClosed &&
@@ -938,7 +1006,16 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void initState() {
     super.initState();
+    if (isWindows) {
+      bind.mainSetCommon(key: 'soludesk-update-check', value: '');
+    }
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
+      if (isWindows) {
+        final u = bind.mainGetCommonSync(key: 'soludesk-update-state');
+        if (u != _soludeskUpdate && mounted) {
+          setState(() => _soludeskUpdate = u);
+        }
+      }
       await gFFI.serverModel.fetchID();
       final error = await bind.mainGetError();
       if (systemError != error) {

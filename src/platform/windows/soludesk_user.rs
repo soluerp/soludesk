@@ -27,7 +27,7 @@ const RUN_VALUE: &str = "SOLUDESK";
 const OPTIONS_KEY: &str = "Software\\SOLUDESK";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-fn known_folder(id: &windows::core::GUID) -> ResultType<PathBuf> {
+pub(super) fn known_folder(id: &windows::core::GUID) -> ResultType<PathBuf> {
     let value = unsafe { SHGetKnownFolderPath(id, KF_FLAG_DEFAULT, None) }?;
     let path = unsafe { value.to_string() };
     unsafe { Com::CoTaskMemFree(Some(value.0.cast())) };
