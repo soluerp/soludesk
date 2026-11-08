@@ -365,6 +365,11 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     }
                 }
+                "soludesk_is_cellular" -> {
+                    // SOLUDESK: em dados móveis (CGNAT) a conexão direta cai segundos
+                    // depois de abrir; o Dart usa isso para ir pela retransmissão.
+                    result.success(soludeskIsCellular())
+                }
                 "enable_soft_keyboard" -> {
                     // https://blog.csdn.net/hanye2020/article/details/105553780
                     if (call.arguments as Boolean) {
@@ -1017,5 +1022,22 @@ class MainActivity : FlutterActivity() {
     override fun onStart() {
         super.onStart()
         stopService(Intent(this, FloatingWindowService::class.java))
+    }
+
+    private fun soludeskIsCellular(): Boolean {
+        return try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) &&
+                    !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) &&
+                    !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+            } else {
+                @Suppress("DEPRECATION")
+                cm.activeNetworkInfo?.type == android.net.ConnectivityManager.TYPE_MOBILE
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 }

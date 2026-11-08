@@ -3001,6 +3001,13 @@ impl LoginConfigHandler {
                 || force_relay;
         self.policy_relay = self.peer_relay || Config::is_proxy();
         self.force_relay = self.policy_relay || use_ws();
+        // SOLUDESK: like ws, a fact about this connection, not the peer; never persisted.
+        #[cfg(target_os = "android")]
+        {
+            if soludesk_mobile_data_relay() {
+                self.force_relay = true;
+            }
+        }
         if let Some((real_id, server, key)) = &self.other_server {
             let other_server_key = self.get_option("other-server-key");
             if !other_server_key.is_empty() && key.is_empty() {
@@ -5880,4 +5887,13 @@ mod kx_tests {
         assert_eq!(seen.picked, 1);
         assert!(!seen.decrypted && !decrypted);
     }
+}
+
+/// SOLUDESK: on mobile data the carrier's CGNAT resets a punched direct TCP
+/// connection a few seconds after it opens (video shows, input never arrives),
+/// so the Android app sets this option before each connection while on
+/// cellular and the session goes through the relay.
+#[cfg(target_os = "android")]
+fn soludesk_mobile_data_relay() -> bool {
+    LocalConfig::get_option("soludesk-dados-moveis") == "Y"
 }

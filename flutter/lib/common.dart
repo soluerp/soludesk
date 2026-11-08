@@ -2624,6 +2624,19 @@ connect(BuildContext context, String id,
   forceRelay = id != oldId || forceRelay;
   assert(!(isFileTransfer && isTcpTunneling && isRDP),
       "more than one connect type");
+  // SOLUDESK: em dados móveis a operadora (CGNAT) derruba a conexão direta
+  // segundos depois de abrir; a sessão passa pela retransmissão do servidor.
+  // Vale só para esta conexão (não fica gravado no PC da lista).
+  if (isAndroid) {
+    bool dadosMoveis = false;
+    try {
+      dadosMoveis =
+          await gFFI.invokeMethodWithResult<bool>("soludesk_is_cellular") ??
+              false;
+    } catch (_) {}
+    await bind.mainSetLocalOption(
+        key: "soludesk-dados-moveis", value: dadosMoveis ? "Y" : "");
+  }
 
   if (isDesktop) {
     if (desktopType == DesktopType.main) {
