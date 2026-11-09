@@ -63,6 +63,10 @@ pub fn core_main() -> Option<CoreMainAction> {
     let mut arg_exe = Default::default();
     #[cfg(windows)]
     let mut soludesk_update_from: Option<u32> = None;
+    #[cfg(windows)]
+    let mut soludesk_setup_admin = false;
+    #[cfg(windows)]
+    let mut soludesk_from_task = false;
     for arg in std::env::args() {
         if i == 0 {
             arg_exe = arg;
@@ -97,6 +101,16 @@ pub fn core_main() -> Option<CoreMainAction> {
                         .strip_prefix(crate::platform::windows::UPDATE_INSTALL_ARG)
                         .and_then(|v| v.parse::<u32>().ok());
                 }
+            } else if arg == "--soludesk-setup-admin" {
+                #[cfg(windows)]
+                {
+                    soludesk_setup_admin = true;
+                }
+            } else if arg == "--soludesk-from-task" {
+                #[cfg(windows)]
+                {
+                    soludesk_from_task = true;
+                }
             } else if arg.starts_with("--soludesk-wait-pid=") {
                 // Reaberto como administrador pelo botão do SOLUDESK (com UAC):
                 // espera a janela anterior fechar e segue como abertura normal.
@@ -120,6 +134,17 @@ pub fn core_main() -> Option<CoreMainAction> {
         hbb_common::init_log(false, "update");
         crate::platform::windows::finish_update_install(old_pid);
         return None;
+    }
+    #[cfg(windows)]
+    if args.is_empty() {
+        if soludesk_setup_admin {
+            // Aberto pelo UAC aceito na instalação ou no botão do painel.
+            if let Err(e) = crate::platform::windows::create_admin_task() {
+                log::warn!("Modo administrador permanente não ativado: {}", e);
+            }
+        } else if !soludesk_from_task && crate::platform::windows::relaunch_via_admin_task() {
+            return None;
+        }
     }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {

@@ -102,7 +102,12 @@ mod installer_handoff;
 mod installer_shell;
 mod verified_update;
 mod msi_registry;
+mod soludesk_admin;
 mod soludesk_update;
+pub use soludesk_admin::{
+    admin_task_enabled, create_admin_task, relaunch_via_admin_task, remove_admin_task,
+    FROM_TASK_ARG, SETUP_ADMIN_ARG,
+};
 mod soludesk_user;
 pub use soludesk_update::{
     finish_update_install, start_update_checker, start_update_download, update_state_json,
@@ -148,7 +153,7 @@ const HKLM_PREFIX: &str = "HKEY_LOCAL_MACHINE\\";
 
 /// Versão do SOLUDESK mostrada em "Aplicativos instalados". A versão do protocolo
 /// (crate::VERSION, herdada do RustDesk) continua a mesma para manter a compatibilidade.
-pub const SOLUDESK_VERSION: &str = "1.1.2";
+pub const SOLUDESK_VERSION: &str = "1.1.3";
 
 pub fn get_focused_display(displays: Vec<DisplayInfo>) -> Option<usize> {
     unsafe {

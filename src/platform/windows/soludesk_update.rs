@@ -29,7 +29,7 @@ const SIGNATURE_URL: &str =
 const PUBLIC_KEY_B64: &str = include_str!("soludesk_update_pubkey.txt");
 /// Argumento do `.exe` novo: espera o antigo fechar e instala por cima.
 pub const UPDATE_INSTALL_ARG: &str = "--soludesk-update-install=";
-const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+const CHECK_EVERY: Duration = Duration::from_secs(60 * 60);
 const MAX_DOWNLOAD: u64 = 200 * 1024 * 1024;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -69,7 +69,7 @@ pub fn update_state_json() -> String {
 }
 
 /// Começa a verificar atualizações (uma vez por processo da janela principal):
-/// 15 s depois de abrir e depois a cada 6 horas.
+/// 15 s depois de abrir e depois a cada hora.
 pub fn start_update_checker() {
     if CHECKER_STARTED.swap(true, Ordering::SeqCst) {
         return;

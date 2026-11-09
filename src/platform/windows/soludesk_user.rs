@@ -205,9 +205,9 @@ pub fn user_install(options: &str) -> ResultType<PathBuf> {
 
     // Abrir com o Windows: só para este usuário (HKCU\...\Run), sem serviço.
     let (run, _) = hkcu.create_subkey(RUN_KEY)?;
-    if has("startup") {
+    if has("startup") && !super::admin_task_enabled() {
         run.set_value(RUN_VALUE, &format!("\"{}\"", exe_s))?;
-    } else {
+    } else if !has("startup") {
         run.delete_value(RUN_VALUE).ok();
     }
 
@@ -225,6 +225,8 @@ pub fn user_install(options: &str) -> ResultType<PathBuf> {
 /// Remove a instalação por usuário. A pasta é apagada logo depois que este
 /// processo fecha, porque um executável em uso não pode se apagar.
 pub fn user_uninstall() -> ResultType<()> {
+    // Antes de apagar as opções: é lá que fica a marca da tarefa de administrador.
+    super::remove_admin_task();
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     if let Ok(run) = hkcu.open_subkey_with_flags(RUN_KEY, winreg::enums::KEY_SET_VALUE) {
         run.delete_value(RUN_VALUE).ok();
@@ -269,9 +271,14 @@ pub fn is_current_process_elevated() -> bool {
 /// na confirmação normal do Windows (UAC); nada é feito sem esse clique.
 /// `Ok(true)`: o Windows abriu o processo novo, que espera este fechar.
 /// `Ok(false)`: a pessoa cancelou a confirmação.
-pub fn restart_elevated() -> ResultType<bool> {
+/// `setup_admin`: no SOLUDESK instalado, também cria a tarefa que mantém o modo
+/// administrador nas próximas aberturas.
+pub fn restart_elevated(setup_admin: bool) -> ResultType<bool> {
     let exe = std::env::current_exe()?.to_string_lossy().to_string();
-    let arg = format!("{}{}", WAIT_PID_ARG, std::process::id());
+    let mut arg = format!("{}{}", WAIT_PID_ARG, std::process::id());
+    if setup_admin {
+        arg = format!("{} {}", super::SETUP_ADMIN_ARG, arg);
+    }
     super::run_uac(&exe, &arg)
 }
 

@@ -594,10 +594,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   void _confirmRestartElevated() {
     final hasSession = gFFI.serverModel.clients.isNotEmpty;
+    // Instalado: ativa o modo administrador permanente (tarefa do Windows).
+    final installed =
+        bind.mainGetCommonSync(key: 'soludesk-installed') == 'true';
     gFFI.dialogManager.show((setState, close, context) {
       submit() {
         close();
-        bind.mainSetCommon(key: 'soludesk-restart-elevated', value: '');
+        bind.mainSetCommon(
+            key: 'soludesk-restart-elevated', value: installed ? 'setup' : '');
       }
 
       return CustomAlertDialog(
@@ -606,8 +610,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-                'O SOLUDESK vai reabrir como administrador. Assim o técnico consegue usar programas e configurações que pedem administrador.'),
+            Text(installed
+                ? 'O SOLUDESK vai reabrir como administrador e continuar assim nas próximas vezes, inclusive ao entrar no Windows. Assim o técnico consegue usar programas e configurações que pedem administrador.'
+                : 'O SOLUDESK vai reabrir como administrador. Assim o técnico consegue usar programas e configurações que pedem administrador.'),
             const SizedBox(height: 8),
             const Text(
                 'O Windows vai pedir a sua confirmação. Só aceite se você confia no técnico.'),

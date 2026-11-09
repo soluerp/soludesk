@@ -112,7 +112,23 @@ pub fn install_me(_options: String, _path: String, _silent: bool, _debug: bool) 
         match crate::platform::windows::user_install(&_options) {
             Ok(exe) => {
                 if !_silent {
-                    std::process::Command::new(&exe).spawn().ok();
+                    // SOLUDESK instalado fica em modo administrador: o Windows pede
+                    // UMA confirmação (UAC) e a versão instalada cria a tarefa que
+                    // a abre elevada daí em diante. Se cancelar, abre normal.
+                    let arg = format!(
+                        "{} {}{}",
+                        crate::platform::windows::SETUP_ADMIN_ARG,
+                        crate::platform::windows::WAIT_PID_ARG,
+                        std::process::id()
+                    );
+                    let elevated = crate::platform::windows::run_uac(
+                        &exe.to_string_lossy(),
+                        &arg,
+                    )
+                    .unwrap_or(false);
+                    if !elevated {
+                        std::process::Command::new(&exe).spawn().ok();
+                    }
                 }
             }
             Err(err) => {

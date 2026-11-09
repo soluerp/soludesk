@@ -2712,6 +2712,12 @@ pub fn main_get_common(key: String) -> String {
         #[cfg(not(target_os = "windows"))]
         return "{}".to_owned();
     }
+    if key == "soludesk-installed" {
+        #[cfg(target_os = "windows")]
+        return crate::platform::windows::is_running_from_user_install().to_string();
+        #[cfg(not(target_os = "windows"))]
+        return false.to_string();
+    }
     if key == "soludesk-is-elevated" {
         #[cfg(target_os = "windows")]
         return crate::platform::windows::is_current_process_elevated().to_string();
@@ -2852,7 +2858,8 @@ pub fn main_set_common(_key: String, _value: String) {
     #[cfg(target_os = "windows")]
     if _key == "soludesk-restart-elevated" {
         // A confirmação do UAC bloqueia até a pessoa responder; não trava a interface.
-        std::thread::spawn(|| match crate::platform::windows::restart_elevated() {
+        let setup_admin = _value == "setup";
+        std::thread::spawn(move || match crate::platform::windows::restart_elevated(setup_admin) {
             Ok(true) => {
                 log::info!("SOLUDESK reaberto como administrador (UAC aceito)");
                 std::process::exit(0);
