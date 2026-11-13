@@ -137,14 +137,27 @@ pub fn core_main() -> Option<CoreMainAction> {
     }
     #[cfg(windows)]
     if args.is_empty() {
+        // Log da janela principal já aqui (o nome é o mesmo usado mais abaixo),
+        // para registrar a ativação do modo administrador e a abertura pela tarefa.
+        hbb_common::init_log(false, "");
+        crate::platform::windows::log_main_start(soludesk_from_task, soludesk_setup_admin);
         if soludesk_setup_admin {
             // Aberto pelo UAC aceito na instalação ou no botão do painel.
             if let Err(e) = crate::platform::windows::create_admin_task() {
                 log::warn!("Modo administrador permanente não ativado: {}", e);
+                crate::platform::message_box(&format!(
+                    "O SOLUDESK abriu como administrador, mas não conseguiu deixar o modo administrador permanente.\n\n{}",
+                    e
+                ));
             }
-        } else if !soludesk_from_task && crate::platform::windows::relaunch_via_admin_task() {
+        } else if soludesk_from_task {
+            if crate::platform::windows::handle_task_start() {
+                return None;
+            }
+        } else if crate::platform::windows::relaunch_via_admin_task() {
             return None;
         }
+        crate::platform::windows::ensure_admin_task_current();
     }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {

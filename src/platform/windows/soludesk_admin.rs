@@ -15,6 +15,10 @@ use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
 const OPTIONS_KEY: &str = "Software\\SOLUDESK";
 const ADMIN_FLAG: &str = "AdminTask";
+/// Versão do formato da tarefa; ao mudar, instalações elevadas recriam a tarefa.
+const TASK_FORMAT: &str = "2";
+const TASK_FORMAT_VALUE: &str = "AdminTaskFormat";
+const TASK_RETRY_VALUE: &str = "AdminTaskRetry";
 const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const RUN_VALUE: &str = "SOLUDESK";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -99,7 +103,7 @@ pub fn create_admin_task() -> ResultType<()> {
     let principal = xml_escape(&user_principal());
     let trigger = if startup_enabled() {
         format!(
-            "<LogonTrigger><Enabled>true</Enabled><UserId>{}</UserId><Delay>PT5S</Delay></LogonTrigger>",
+            "<LogonTrigger><Enabled>true</Enabled><UserId>{}</UserId><Delay>PT10S</Delay></LogonTrigger>",
             principal
         )
     } else {
@@ -158,6 +162,7 @@ pub fn create_admin_task() -> ResultType<()> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (opts, _) = hkcu.create_subkey(OPTIONS_KEY)?;
     opts.set_value(ADMIN_FLAG, &"1".to_owned())?;
+    opts.set_value(TASK_FORMAT_VALUE, &TASK_FORMAT.to_owned())?;
     // A tarefa passa a abrir o SOLUDESK ao entrar no Windows (já como
     // administrador); a entrada comum de inicialização deixaria duas cópias.
     if let Ok(run) = hkcu.open_subkey_with_flags(RUN_KEY, winreg::enums::KEY_SET_VALUE) {
@@ -167,11 +172,114 @@ pub fn create_admin_task() -> ResultType<()> {
     Ok(())
 }
 
-fn main_window_exists() -> bool {
-    use winapi::um::winuser::FindWindowW;
+/// Processo dono da janela principal do SOLUDESK já aberta (se houver).
+fn main_window_pid() -> Option<u32> {
+    use winapi::um::winuser::{FindWindowW, GetWindowThreadProcessId};
     let class: Vec<u16> = "FLUTTER_RUNNER_WIN32_WINDOW\0".encode_utf16().collect();
     let title: Vec<u16> = format!("{}\0", crate::get_app_name()).encode_utf16().collect();
-    unsafe { !FindWindowW(class.as_ptr(), title.as_ptr()).is_null() }
+    unsafe {
+        let hwnd = FindWindowW(class.as_ptr(), title.as_ptr());
+        if hwnd.is_null() {
+            return None;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == 0 || pid == std::process::id() {
+            None
+        } else {
+            Some(pid)
+        }
+    }
+}
+
+fn main_window_exists() -> bool {
+    main_window_pid().is_some()
+}
+
+fn options_key() -> Option<RegKey> {
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey_with_flags(OPTIONS_KEY, winreg::enums::KEY_READ | winreg::enums::KEY_SET_VALUE)
+        .ok()
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Registra no log como esta janela principal foi aberta (diagnóstico).
+pub fn log_main_start(from_task: bool, setup_admin: bool) {
+    log::info!(
+        "SOLUDESK {} iniciado: administrador={}, pela_tarefa={}, ativar_modo={}, instalado={}, modo_permanente={}, args={:?}",
+        super::SOLUDESK_VERSION,
+        is_current_process_elevated(),
+        from_task,
+        setup_admin,
+        is_running_from_user_install(),
+        admin_task_enabled(),
+        std::env::args().skip(1).collect::<Vec<_>>()
+    );
+}
+
+/// Aberto pela tarefa de administrador. `true` = este processo deve sair.
+/// - Sem elevação (o Windows às vezes inicia a tarefa de logon sem o token de
+///   administrador): pede ao Agendador que rode a tarefa de novo, no máximo uma
+///   vez por minuto, para não entrar em laço.
+/// - Com elevação, mas já existe um SOLUDESK aberto SEM administrador (aberto
+///   antes, por exemplo pelo Windows reabrindo programas): fecha aquele e segue.
+pub fn handle_task_start() -> bool {
+    if !is_current_process_elevated() {
+        let last = options_key()
+            .and_then(|k| k.get_value::<String, _>(TASK_RETRY_VALUE).ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(0);
+        let now = now_secs();
+        if now.saturating_sub(last) < 60 {
+            log::warn!("Tarefa abriu o SOLUDESK sem administrador de novo; seguindo sem modo administrador");
+            return false;
+        }
+        if let Some(k) = options_key() {
+            k.set_value(TASK_RETRY_VALUE, &now.to_string()).ok();
+        }
+        log::warn!("Tarefa abriu o SOLUDESK sem administrador; rodando a tarefa de novo");
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        return schtasks(&["/Run", "/TN", &task_name()]);
+    }
+    if let Some(pid) = main_window_pid() {
+        if super::is_elevated(Some(pid)).unwrap_or(true) {
+            // Já há um SOLUDESK administrador aberto: a abertura comum o mostra.
+            return false;
+        }
+        log::info!("Fechando o SOLUDESK sem administrador ({}) aberto antes da tarefa", pid);
+        super::quit_owner(pid);
+        for _ in 0..30 {
+            if !main_window_exists() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
+    false
+}
+
+/// No SOLUDESK instalado e já elevado, com o modo permanente ativado: recria a
+/// tarefa se ela foi feita por uma versão anterior com formato diferente.
+pub fn ensure_admin_task_current() {
+    if !admin_task_enabled() || !is_current_process_elevated() || !is_running_from_user_install() {
+        return;
+    }
+    let format = options_key()
+        .and_then(|k| k.get_value::<String, _>(TASK_FORMAT_VALUE).ok())
+        .unwrap_or_default();
+    if format == TASK_FORMAT {
+        return;
+    }
+    match create_admin_task() {
+        Ok(()) => log::info!("Tarefa de administrador atualizada para o formato {}", TASK_FORMAT),
+        Err(e) => log::warn!("Não foi possível atualizar a tarefa de administrador: {}", e),
+    }
 }
 
 /// Abertura comum (atalho, ícone) do SOLUDESK instalado com modo administrador:
